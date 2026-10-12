@@ -1,3 +1,13 @@
-// 占位入口：stdio MCP server 将在下一次提交接入（server.ts 工具层）。
-console.error("niri-mcp: MCP server 尚未接线，见 src/server.ts（开发中）");
-process.exit(1);
+#!/usr/bin/env node
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { buildServer } from "./server.js";
+
+async function main(): Promise<void> {
+  const server = buildServer();
+  await server.connect(new StdioServerTransport());
+}
+
+main().catch((e) => {
+  console.error("niri-mcp 启动失败:", e);
+  process.exit(1);
+});

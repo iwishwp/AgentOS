@@ -43,6 +43,50 @@ sudo dnf copr enable avengemedia/dms && sudo dnf install xwayland-satellite
 原生组件（ydotool、gpu-screen-recorder、WPS 等闭源软件）在 aarch64 上的可用性
 不承诺，遇到差异记录即可，不为 ARM 特判代码。
 
+### 0.2 在 Apple Silicon 的 UTM 里安装 Fedora Workstation（分步）
+
+前置：从 [mac.getutm.app](https://mac.getutm.app) 装 UTM（免费）；Mac 磁盘留 ~40G。
+
+1. **下载镜像**：[fedoraproject.org/workstation/download](https://fedoraproject.org/workstation/download)
+   选 **aarch64（Apple Silicon）** 的 Live ISO。当前稳定版 F44（F45 正式版 10/20 发布，发布后直接换新版）。
+   ⚠️ 必须是 aarch64——下成 x86_64 会无法启动或慢到不可用。
+2. **建虚拟机**：UTM → 新建 → **Virtualize**（不要选 Emulate，那是跨架构模拟）→ Linux：
+   - ISO 选刚下载的 aarch64 Live ISO；
+   - 内存 ≥ 4G（建议 8G）、CPU ≥ 4、磁盘 ≥ 32G；
+   - 显示保持默认 VirtIO GPU。
+3. **装系统**：启动进 Live 桌面 → "Install to Hard Drive"（Anaconda）：
+   语言/键盘 → Installation Destination 选整块虚拟盘 → 设用户密码 → 开始安装。
+   装完在 UTM 设置里**清空 CD/DVD 的 ISO** 再重启，否则又进 Live。
+4. **首次进入 GNOME 后**：
+   ```bash
+   sudo dnf upgrade -y && sudo systemctl reboot   # 先把内核更到最新再干活
+   sudo dnf install -y spice-vdagent             # UTM 剪贴板共享，装完注销重登生效
+   ```
+5. **把仓库弄进 VM**（三选一）：
+   - 有 GitHub 远端：VM 里直接 `git clone`；
+   - rsync：VM 里 `sudo systemctl enable --now sshd`；UTM 虚拟机设置 → Network →
+     加一条 Port Forward（Host 2222 → Guest 22），然后 Mac 上：
+     ```bash
+     rsync -av -e "ssh -p 2222" --exclude node_modules --exclude dist \
+       ~/codespace/AgentOS/ <vm用户>@localhost:~/AgentOS/
+     ```
+     （把网络模式改成 Bridged 的话，用 `ip addr` 查 VM IP 直接连 22 端口也行）
+   - 临时 HTTP：Mac 上 `cd ~/codespace/AgentOS && python3 -m http.server 8000`，
+     VM 里 `wget` 拉一份（或浏览器下载后解压）。
+6. **跑安装器**（走 install.sh 的 dnf 分支）：
+   ```bash
+   cd ~/AgentOS && ./os/install.sh --with-goose
+   ```
+7. **进 niri 会话**：niri 包自带 wayland-session 文件。先加通知守护进程自启，然后注销，
+   GDM 登录界面右下角齿轮选 **Niri**，登录：
+   ```bash
+   mkdir -p ~/.config/niri
+   echo 'spawn-at-startup "mako"' >> ~/.config/niri/config.kdl
+   ```
+   （niri 没有配置文件也能跑，这行只为拉起 mako）
+8. 之后从 §3 的 L1 开始逐层验证。
+
+
 
 ## 1. 安装 niri 会话与依赖
 
@@ -174,6 +218,10 @@ goose session
 | `echo $NIRI_SOCKET` 为空 | 不在 niri 会话内（SSH/TTY 另一会话）。在 niri 内的终端跑；或手动 `export NIRI_SOCKET=$(ls /run/user/$(id -u)/niri.*.socket | head -1)` |
 | `无法启动 niri`（isError） | PATH 里没有 niri，用 `NIRI_MSG_BIN=/usr/bin/niri` 指定绝对路径 |
 | VM 里 niri 黑屏/崩溃 | 虚拟显卡未开 3D 加速：virtio-gpu + `virtio=gl`（virt-manager 勾选 3D），VMware 开 3D 加速 |
+| UTM 里 niri 动画略钝 | aarch64 VM 走 llvmpipe 软渲染，窗口操作可用即可，验证不依赖 GPU 性能；要真 3D 加速换 Parallels/Fusion 或 x86_64 真机 |
+| 装错 x86_64 ISO | 重下 aarch64 镜像（文件名含 `aarch64`）；Apple Silicon 上 x86_64 只能全模拟，不可用 |
+| UTM 剪贴板不通 | VM 里 `sudo dnf install spice-vdagent` 后注销重登 |
+| GDM 会话列表没有 Niri | 确认 niri 已装：`ls /usr/share/wayland-sessions/` 应有 niri.desktop |
 | `niri msg action ...` 参数错 | niri 版本差异，以 `niri msg action <名字> --help` 为准，回修 `src/niri.ts` |
 | npm install 慢/失败 | 换镜像：`npm config set registry https://registry.npmmirror.com`（国内环境） |
 
@@ -181,3 +229,4 @@ goose session
 
 - 2026-10-13 文档定稿；官方文档核对：`--json` 在子命令前、`niri-session` 启动方式、`NIRI_SOCKET` 语义均已确认，待真机回填。
 - 2026-10-13 新增 Apple Silicon（aarch64）路径：CachyOS 无 ARM 镜像（官方确认），冒烟走 Fedora aarch64 + niri 官方包 + COPR 的 xwayland-satellite；goose 官方支持 arm64。
+- 2026-10-13 新增 §0.2 UTM 安装 Fedora Workstation 分步指南（Workstation aarch64 Live ISO 自 F35 起官方提供）；待今晚实测回填。

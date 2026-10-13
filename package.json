@@ -9,7 +9,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces"
+    "build": "npm run build -w packages/proc && npm run build -w packages/niri-mcp",
+    "test": "npm run build && npm run test -w packages/proc && npm run test -w packages/niri-mcp"
   }
 }

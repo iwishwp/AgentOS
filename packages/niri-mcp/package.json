@@ -17,6 +17,7 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@agentos/proc": "*",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "zod": "^4.6.6"
   },

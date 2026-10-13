@@ -1,7 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import type { CommandRunner } from "@agentos/proc";
+import { ShellRunner } from "@agentos/proc";
 import { NiriClient, NiriError } from "./niri.js";
-import { ShellRunner, type CommandRunner } from "./runner.js";
 
 const windowId = z.number().int().describe("窗口 id（来自 list_windows 的 id 字段）");
 const workspaceRef = z

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { FakeRunner } from "@agentos/proc/testing";
 import { NiriClient, NiriError } from "../src/niri.js";
-import { FakeRunner } from "./fake.js";
 
 const BIN = "/fake/niri";
 

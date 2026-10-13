@@ -1,8 +1,8 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { FakeRunner } from "@agentos/proc/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildServer } from "../src/server.js";
-import { FakeRunner } from "./fake.js";
 
 const TOOL_NAMES = [
   "list_windows",

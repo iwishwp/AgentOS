@@ -1,0 +1,26 @@
+{
+  "name": "@agentos/proc",
+  "version": "0.1.0",
+  "description": "共享命令执行层：CommandRunner 抽象、ShellRunner 实现与测试替身",
+  "type": "module",
+  "license": "Apache-2.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

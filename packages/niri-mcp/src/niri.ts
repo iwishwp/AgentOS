@@ -1,4 +1,4 @@
-import type { CommandRunner } from "./runner.js";
+import type { CommandRunner } from "@agentos/proc";
 
 export class NiriError extends Error {}
 

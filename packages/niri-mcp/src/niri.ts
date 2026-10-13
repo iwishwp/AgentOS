@@ -54,14 +54,14 @@ export class NiriClient {
   }
 
   private async queryJson(what: string): Promise<unknown> {
-    const r = await this.runner.run(this.bin, ["msg", "-j", what]);
+    const r = await this.runner.run(this.bin, ["msg", "--json", what]);
     if (r.code !== 0) {
-      throw new NiriError(`niri msg -j ${what} 失败: ${describeFailure(r)}`);
+      throw new NiriError(`niri msg --json ${what} 失败: ${describeFailure(r)}`);
     }
     try {
       return JSON.parse(r.stdout);
     } catch {
-      throw new NiriError(`niri msg -j ${what} 输出不是合法 JSON`);
+      throw new NiriError(`niri msg --json ${what} 输出不是合法 JSON`);
     }
   }
 

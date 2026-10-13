@@ -19,24 +19,24 @@ function make() {
 }
 
 describe("查询命令", () => {
-  it("windows/workspaces/outputs 走 msg -j 并解析 JSON", async () => {
+  it("windows/workspaces/outputs 走 msg --json 并解析 JSON", async () => {
     const { runner, niri } = make();
-    runner.on(["msg", "-j", "windows"], { stdout: '[{"id":1,"title":"alacritty"}]' });
+    runner.on(["msg", "--json", "windows"], { stdout: '[{"id":1,"title":"alacritty"}]' });
 
     await expect(niri.windows()).resolves.toEqual([{ id: 1, title: "alacritty" }]);
-    expect(runner.lastArgs()).toEqual(["msg", "-j", "windows"]);
+    expect(runner.lastArgs()).toEqual(["msg", "--json", "windows"]);
     expect(runner.calls[0]?.cmd).toBe(BIN);
   });
 
   it("非 JSON 输出报 NiriError", async () => {
     const { runner, niri } = make();
-    runner.on(["msg", "-j", "workspaces"], { stdout: "not-json" });
+    runner.on(["msg", "--json", "workspaces"], { stdout: "not-json" });
     await expect(niri.workspaces()).rejects.toThrow(NiriError);
   });
 
   it("命令失败时把 stderr 带进错误信息", async () => {
     const { runner, niri } = make();
-    runner.on(["msg", "-j", "outputs"], { code: 1, stderr: "boom" });
+    runner.on(["msg", "--json", "outputs"], { code: 1, stderr: "boom" });
     await expect(niri.outputs()).rejects.toThrow("boom");
   });
 });

@@ -42,7 +42,7 @@ describe("MCP 工具面", () => {
   });
 
   it("list_windows 返回解析好的 JSON", async () => {
-    runner.on(["msg", "-j", "windows"], {
+    runner.on(["msg", "--json", "windows"], {
       stdout: '[{"id":3,"title":"firefox","is_focused":true}]',
     });
     const r = await client.callTool({ name: "list_windows", arguments: {} });

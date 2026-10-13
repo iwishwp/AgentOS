@@ -2,6 +2,13 @@
 
 > niri-mcp 是一个 stdio MCP server，任何 MCP 客户端都能挂载；本文以 goose 为例（我们默认的 agent 引擎）。
 
+## 安装 goose
+
+```bash
+curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | bash
+goose configure   # 配置模型 provider
+```
+
 ## 前置条件
 
 - 在 niri 会话内运行（`niri msg` 依赖 `NIRI_SOCKET` 环境变量指向 niri 的 IPC socket）；

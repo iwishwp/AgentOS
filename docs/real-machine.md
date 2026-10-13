@@ -8,17 +8,50 @@
 | 路径 | 适用 | 说明 |
 |---|---|---|
 | **A. 虚拟机冒烟**（推荐先走） | 快速验证 | QEMU/virt-manager 或 VMware：UEFI 启用、virtio-gpu **开启 3D 加速**、内存 ≥ 4G。装一个最小 Arch/CachyOS 即可 |
+| A-ARM. Apple Silicon 虚拟机 | mac 上的功能冒烟 | **只能跑 aarch64**，CachyOS 无 ARM 镜像，走 Fedora aarch64，见下节 |
 | B. 物理机/已有系统 | 正式环境 | 已在用 Arch/CachyOS 的机器直接加装 niri 会话，不动现有 DE |
 
 全新 CachyOS 安装：官网下载 ISO → 写盘（`dd` 或 Ventoy）→ 走安装器（桌面选择任意，后面我们用自己的 niri 会话；不装 DE 也行）。
+
+### 0.1 Apple Silicon（ARM64）虚拟机路径
+
+macOS（Apple Silicon）上的虚拟机**只能运行 aarch64 客户机**（跑 amd64 要走 CPU 全模拟，慢到不可用）。架构现状：
+
+| 组件 | aarch64 现状 |
+|---|---|
+| CachyOS | ❌ 无官方 ARM 镜像（官方计划中，等 Arch Linux ARM 上游成熟） |
+| niri | ✅ Rust 原生，Fedora **官方仓库**直接 `dnf install niri` |
+| xwayland-satellite | ⚠️ 不在 Fedora 官方仓库，走 COPR（见下） |
+| goose | ✅ 官方发布 arm64 Linux 二进制（安装脚本声明支持 x86_64/arm64） |
+| Node.js / 我们的 TS 代码 | ✅ 天然跨架构 |
+
+**推荐流程（UTM / VMware 装 Fedora Workstation aarch64）**：
+
+```bash
+# 系统包：niri 官方仓库 + 通知/剪贴板/终端/启动器
+sudo dnf install niri xdg-desktop-portal-gnome xdg-desktop-portal-gtk \
+  alacritty fuzzel wl-clipboard libnotify mako nodejs npm git
+
+# X11 兼容层（COPR，可选——不测 X11 应用可以跳过）
+sudo dnf copr enable avengemedia/dms && sudo dnf install xwayland-satellite
+
+# 之后与 x86_64 路径完全相同：注销 → 登录界面选 Niri 会话 → L1–L4 验证
+```
+
+**边界要认清**：ARM VM 只做**功能冒烟**（验证代码逻辑、MCP 链路、goose 集成）；
+发行与长期支持以 **x86_64 为唯一主线**（见 architecture.md《架构支持策略》）。
+原生组件（ydotool、gpu-screen-recorder、WPS 等闭源软件）在 aarch64 上的可用性
+不承诺，遇到差异记录即可，不为 ARM 特判代码。
+
 
 ## 1. 安装 niri 会话与依赖
 
 ```bash
 # 基础会话（Arch/CachyOS 官方仓库；来自 niri 官方文档的快速开始）
+# wl-clipboard=wl-copy/wl-paste  libnotify=notify-send  mako=通知守护进程
 sudo pacman -Syu niri xwayland-satellite \
   xdg-desktop-portal-gnome xdg-desktop-portal-gtk \
-  alacritty fuzzel
+  alacritty fuzzel wl-clipboard libnotify mako
 
 # 开发依赖
 sudo pacman -S nodejs npm git
@@ -27,6 +60,9 @@ node --version   # 确认 ≥ 20（Arch 源里的 nodejs 远超此版本）
 # 可选：Noctalia 桌面 shell（视觉体验，验证不是必需）
 # 安装方式见 github.com/noctalia-dev/noctalia
 ```
+
+> mako（通知守护进程）需要在 niri 启动时拉起：`~/.config/niri/config.kdl` 里加
+> `spawn-at-startup "mako"`。desktop-mcp 的通知工具依赖它。
 
 启动会话：注销 → TTY 登录 → 运行 `niri-session`（systemd 系统；其他 init 用 `niri --session`）。
 若用登录管理器（greetd/SDDM/GDM），选择 Niri 会话即可。
@@ -144,3 +180,4 @@ goose session
 ## 实测记录
 
 - 2026-10-13 文档定稿；官方文档核对：`--json` 在子命令前、`niri-session` 启动方式、`NIRI_SOCKET` 语义均已确认，待真机回填。
+- 2026-10-13 新增 Apple Silicon（aarch64）路径：CachyOS 无 ARM 镜像（官方确认），冒烟走 Fedora aarch64 + niri 官方包 + COPR 的 xwayland-satellite；goose 官方支持 arm64。

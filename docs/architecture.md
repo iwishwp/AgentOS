@@ -105,6 +105,18 @@
   需要时再做 archiso respin 出 ISO；不 fork 发行版；
 - btrfs（CachyOS 默认）+ snapper：agent 系统级变更前自动快照，支持一键回滚。
 
+### 7.1 架构支持策略
+
+| 层级 | 架构 | 约定 |
+|---|---|---|
+| **Tier 1（主线，唯一承诺）** | x86_64 (amd64) | 桌面主流所在；M5 的 ISO/meta-package 只出 x86_64；CI 与回归以 x86_64 为准 |
+| **Tier 2（冒烟，best-effort）** | aarch64 (arm64) | 用于 Apple Silicon 虚拟机上的功能验证（macOS 虚拟机只能跑 arm64）。不进发行，不为 ARM 特判代码，遇到原生组件缺失记录即可 |
+
+依据：CachyOS 无官方 aarch64 镜像（计划中等 Arch Linux ARM 上游），ARM 冒烟走
+Fedora aarch64（niri 在其官方仓库）；goose 官方二进制含 arm64；我们自身的 TS/Node
+代码天然跨架构。aarch64 真正的角色是**未来的第二物理形态**（ARM 笔记本/一体机），
+届时再评估升 Tier。
+
 ## 8. 安全总纲
 
 - **权限分级**：文件读写/开应用→免批；装软件/改配置→portal/polkit 确认；删数据/改系统→强确认；

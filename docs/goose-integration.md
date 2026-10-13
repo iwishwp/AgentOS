@@ -18,7 +18,7 @@ goose configure   # 配置模型 provider
 ## 挂载到 goose
 
 goose 的 MCP 扩展配置在 `~/.config/goose/config.yaml`（不同版本字段名略有差异，以
-`goose configure` 向导生成的格式为准）：
+`goose configure` 向导生成的格式为准）。两个 server 都挂上：
 
 ```yaml
 extensions:
@@ -29,6 +29,11 @@ extensions:
       - /path/to/AgentOS/packages/niri-mcp/dist/index.js
     envs:
       NIRI_SOCKET: ${NIRI_SOCKET}
+  desktop:
+    type: stdio
+    command: node
+    args:
+      - /path/to/AgentOS/packages/desktop-mcp/dist/index.js
 ```
 
 或用向导添加：
@@ -60,6 +65,6 @@ npx @modelcontextprotocol/inspector node packages/niri-mcp/dist/index.js
 
 ## 路线
 
-- M0：本 server（窗口/工作区/spawn）；
-- M1：`desktop-mcp`（xdg-open/通知/剪贴板）、`system-mcp`、`files-mcp` 陆续挂载；
+- M0：niri-mcp（窗口/工作区/spawn）+ goose systemd 服务化（user service 单元，待 L3 定稿）；
+- M1：`desktop-mcp`（xdg-open/通知/剪贴板，已落地）后续接 `system-mcp`、`files-mcp`；
 - M3：事件流（`niri msg` 的 window/workspace 事件）接入 goose 上下文，让 agent 感知桌面变化。

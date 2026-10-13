@@ -13,16 +13,22 @@
 
 ## 当前状态
 
-🚧 **M0 奠基阶段**——仓库与设计文档落地中，第一个 MCP server（`niri-mcp`）开发中。
+🚧 **M0 奠基阶段**——设计文档落地；`niri-mcp`（窗口/工作区/spawn）与 `desktop-mcp`
+（打开应用/通知/剪贴板）已可用（33 个测试全绿）；`os/install.sh` 一键安装就绪。
 
 ## 快速开始
 
-（开发期）体验 `niri-mcp`（需在 niri 会话内才有真实数据；无 niri 时仅能跑单测）：
+真机/虚拟机（Arch/CachyOS 或 Fedora，支持 x86_64 与 aarch64 冒烟）：
 
 ```bash
-npm install        # 仓库根目录
-npm run build      # 构建所有 packages
-npm test           # 跑通所有测试（含 MCP 冒烟测试，不依赖 niri）
+./os/install.sh               # 系统包 + 构建 + 测试（--skip-packages 跳过系统包）
+./os/install.sh --with-goose  # 顺带安装 goose CLI
+```
+
+开发机（任意平台，测试不依赖真实桌面环境）：
+
+```bash
+npm install && npm run build && npm test
 ```
 
 接入 goose（stdio MCP server）示例配置见 [docs/goose-integration.md](docs/goose-integration.md)。

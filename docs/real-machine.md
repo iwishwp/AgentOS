@@ -113,6 +113,40 @@ echo 'spawn-at-startup "mako"' >> ~/.config/niri/config.kdl
 
 之后从 §3 的 L1 开始逐层验证。
 
+### 0.3 配置 Mac → VM 的 SSH（顺带让开发 agent 远程操作）
+
+Fedora Workstation 默认不启 sshd。VM 里两步：
+
+```bash
+sudo dnf install -y openssh-server      # 一般已预装
+sudo systemctl enable --now sshd
+# FedoraWorkstation 防火墙区默认放行 ssh；不通再执行：
+# sudo firewall-cmd --add-service=ssh --permanent && sudo firewall-cmd --reload
+hostname -I                             # 记下 VM 的 IP（Fusion NAT 网段 192.168.x.x）
+```
+
+Mac 侧配密钥免密登录（免密是远程自动化的前提）：
+
+```bash
+[[ -f ~/.ssh/id_ed25519 ]] || ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519
+ssh-copy-id <vm用户>@<VM_IP>             # 输一次 VM 密码，之后免密
+```
+
+建议加个别名（`~/.ssh/config`）：
+
+```
+Host agentos-vm
+    HostName <VM_IP>
+    User <vm用户>
+    StrictHostKeyChecking accept-new
+```
+
+之后 `ssh agentos-vm` 直达。Fusion 的 NAT 下 VM IP 通常重启不变；若漂移，可在
+`/Library/Preferences/VMware Fusion/vmnet8/dhcpd.conf` 加 DHCP 保留，或每次 `hostname -I` 重查。
+
+注意：远程跑的命令遇到 `sudo` 仍要密码——需要 agent 代跑的 sudo 步骤（装包等）
+要么用户在 VM 控制台自己执行，要么对个别命令配 NOPASSWD（不建议对 wheel 全开）。
+
 
 
 ## 1. 安装 niri 会话与依赖

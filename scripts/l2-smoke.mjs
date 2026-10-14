@@ -15,9 +15,12 @@ function textOf(r) {
   return r.content?.[0]?.text ?? "";
 }
 
+// 注意：MCP SDK 的 stdio 客户端默认只透传白名单环境变量（HOME/PATH/USER 等），
+// NIRI_SOCKET 会被丢掉——必须显式传完整 env。
 const transport = new StdioClientTransport({
   command: process.execPath,
   args: [server],
+  env: { ...process.env },
 });
 const client = new Client({ name: "l2-smoke", version: "0.0.0" });
 await client.connect(transport);
@@ -25,8 +28,10 @@ await client.connect(transport);
 const { tools } = await client.listTools();
 console.log("已注册工具:", tools.map((t) => t.name).join(", "));
 
+let failed = 0;
 for (const t of ["list_windows", "list_workspaces", "list_outputs"]) {
   const r = await client.callTool({ name: t, arguments: {} });
+  if (r.isError) failed++;
   console.log(`\n== ${t} == isError=${r.isError === true}`);
   console.log(textOf(r).slice(0, 240));
 }
@@ -34,7 +39,13 @@ for (const t of ["list_windows", "list_workspaces", "list_outputs"]) {
 // 生命周期：开 alacritty → 移动 → 关闭
 await client.callTool({ name: "open_app", arguments: { command: ["alacritty"] } });
 await sleep(2000);
-const wins = JSON.parse(textOf(await client.callTool({ name: "list_windows", arguments: {} })));
+let wins = [];
+try {
+  wins = JSON.parse(textOf(await client.callTool({ name: "list_windows", arguments: {} })));
+} catch {
+  failed++;
+  console.log("\n!! list_windows 返回的不是 JSON，前面的查询应该已经报错");
+}
 const target = wins.find((w) => String(w.app_id ?? "").includes("alacritty"));
 if (!target) {
   console.log("\n!! alacritty 窗口未出现，检查 spawn 是否成功");
@@ -50,4 +61,5 @@ if (!target) {
 }
 
 await client.close();
-console.log("\n== L2 冒烟完成 ==");
+console.log(`\n== L2 冒烟完成（失败项: ${failed}）==`);
+process.exit(failed > 0 ? 1 : 0);

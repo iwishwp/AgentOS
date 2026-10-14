@@ -16,16 +16,20 @@
 
 ---
 
-## M0 奠基（进行中）
+## M0 奠基（进行中 · 真机验证已完成大半）
 
-**目标**：跑通最小闭环——agent 能通过 MCP 操作 niri 窗口/工作区，验证“goose + 自研 MCP server”这条集成路线。
+**目标**：跑通最小闭环——agent 能通过 MCP 操作 niri 窗口/工作区，验证”goose + 自研 MCP server”这条集成路线。
 
 范围：
 
 - 仓库、架构文档、里程碑计划、凭据设计文档；
 - 真机参考环境：CachyOS + niri + Noctalia（手工安装，形成安装笔记，为 M5 铺路）；
-- goose 以 systemd user service 方式常驻（写 service 单元与配置样例）；
+- goose 以 systemd user service 方式常驻（service 单元草稿已落 `os/systemd/`，`goose serve` = ACP over HTTP/WebSocket）；
 - **`niri-mcp` v0**：窗口/工作区查询、聚焦/移动/关闭窗口、spawn 应用。
+
+**进度（2026-10-14，Fedora 44 aarch64 @ VMware Fusion 真机）**：
+L1 ✅ / L2 ✅ / desktop 链路 ✅（详录 real-machine.md 实测记录）；L3 配置已就绪，
+待 LLM API key 后执行。基座评估数据同步采集完成（见 §M0 说明与 real-machine.md）。
 
 退出标准：终端对话 → agent 打开、排列、关闭应用，并能报告当前窗口与工作区状态。
 

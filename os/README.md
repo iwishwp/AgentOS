@@ -5,7 +5,7 @@ AgentOS 面向最终用户的部分，当前是 M5（发行）的种子，随里
 | 文件/子目录 | 状态 | 说明 |
 |---|---|---|
 | `install.sh` | ✅ 可用 | 开发环境一键安装：系统包（pacman/dnf）+ 构建 + 测试，支持 `--skip-packages` / `--with-goose` |
-| `systemd/` | 计划 M0 收尾 | goose 常驻的 user service 单元（待 L3 确认 goose 无头模式后定稿） |
+| `systemd/agentos-goose.service` | 草稿 | goose 常驻（`goose serve`，ACP over HTTP/WebSocket，127.0.0.1:3284），密钥走 EnvironmentFile；真机验证后转正 |
 | `metapackage/` | 计划 M5 | pacman meta-package（AgentOS 全组件 + 默认配置） |
 | `archiso/` | 计划 M5 | archiso respin 配置（出 ISO） |
 

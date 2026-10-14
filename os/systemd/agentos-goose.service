@@ -1,0 +1,29 @@
+# goose 常驻服务单元（M0 草稿，真机验证后转正）
+#
+# 形态：ACP over HTTP/WebSocket，默认仅本机监听（127.0.0.1:3284），
+# 聊天 UI / QuickShell 面板作为客户端接入。
+# 实测依据：goose 1.54.0 `goose serve --help`（--host 默认 127.0.0.1，--port 默认 3284）。
+#
+# 安装：
+#   cp agentos-goose.service ~/.config/systemd/user/
+#   mkdir -p ~/.config/agentos
+#   echo 'OPENAI_API_KEY=...' > ~/.config/agentos/goose.env   # 密钥不进 git
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now agentos-goose
+#
+# 注意：goose 扩展里 niri-mcp/desktop-mcp 的启动器会自动发现会话环境
+# （scripts/env/*.sh），但服务在 graphical-session 内启动才能拿到桌面会话。
+
+[Unit]
+Description=AgentOS goose agent daemon (ACP over HTTP/WebSocket)
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=%h/.local/bin/goose serve
+EnvironmentFile=%h/.config/agentos/goose.env
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical-session.target

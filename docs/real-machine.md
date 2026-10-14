@@ -43,48 +43,75 @@ sudo dnf copr enable avengemedia/dms && sudo dnf install xwayland-satellite
 原生组件（ydotool、gpu-screen-recorder、WPS 等闭源软件）在 aarch64 上的可用性
 不承诺，遇到差异记录即可，不为 ARM 特判代码。
 
-### 0.2 在 Apple Silicon 的 UTM 里安装 Fedora Workstation（分步）
+### 0.2 在 Apple Silicon 虚拟机里安装 Fedora Workstation（分步）
 
-前置：从 [mac.getutm.app](https://mac.getutm.app) 装 UTM（免费）；Mac 磁盘留 ~40G。
+适用于 UTM 与 VMware Fusion。前置：Mac 磁盘留 ~40G。
 
-1. **下载镜像**：[fedoraproject.org/workstation/download](https://fedoraproject.org/workstation/download)
-   选 **aarch64（Apple Silicon）** 的 Live ISO。当前稳定版 F44（F45 正式版 10/20 发布，发布后直接换新版）。
-   ⚠️ 必须是 aarch64——下成 x86_64 会无法启动或慢到不可用。
-2. **建虚拟机**：UTM → 新建 → **Virtualize**（不要选 Emulate，那是跨架构模拟）→ Linux：
-   - ISO 选刚下载的 aarch64 Live ISO；
-   - 内存 ≥ 4G（建议 8G）、CPU ≥ 4、磁盘 ≥ 32G；
-   - 显示保持默认 VirtIO GPU。
-3. **装系统**：启动进 Live 桌面 → "Install to Hard Drive"（Anaconda）：
-   语言/键盘 → Installation Destination 选整块虚拟盘 → 设用户密码 → 开始安装。
-   装完在 UTM 设置里**清空 CD/DVD 的 ISO** 再重启，否则又进 Live。
-4. **首次进入 GNOME 后**：
-   ```bash
-   sudo dnf upgrade -y && sudo systemctl reboot   # 先把内核更到最新再干活
-   sudo dnf install -y spice-vdagent             # UTM 剪贴板共享，装完注销重登生效
-   ```
-5. **把仓库弄进 VM**（三选一）：
-   - 有 GitHub 远端：VM 里直接 `git clone`；
-   - rsync：VM 里 `sudo systemctl enable --now sshd`；UTM 虚拟机设置 → Network →
-     加一条 Port Forward（Host 2222 → Guest 22），然后 Mac 上：
-     ```bash
-     rsync -av -e "ssh -p 2222" --exclude node_modules --exclude dist \
-       ~/codespace/AgentOS/ <vm用户>@localhost:~/AgentOS/
-     ```
-     （把网络模式改成 Bridged 的话，用 `ip addr` 查 VM IP 直接连 22 端口也行）
-   - 临时 HTTP：Mac 上 `cd ~/codespace/AgentOS && python3 -m http.server 8000`，
-     VM 里 `wget` 拉一份（或浏览器下载后解压）。
-6. **跑安装器**（走 install.sh 的 dnf 分支）：
-   ```bash
-   cd ~/AgentOS && ./os/install.sh --with-goose
-   ```
-7. **进 niri 会话**：niri 包自带 wayland-session 文件。先加通知守护进程自启，然后注销，
-   GDM 登录界面右下角齿轮选 **Niri**，登录：
-   ```bash
-   mkdir -p ~/.config/niri
-   echo 'spawn-at-startup "mako"' >> ~/.config/niri/config.kdl
-   ```
-   （niri 没有配置文件也能跑，这行只为拉起 mako）
-8. 之后从 §3 的 L1 开始逐层验证。
+**第 1 步：下载镜像（两种工具通用）**
+[fedoraproject.org/workstation/download](https://fedoraproject.org/workstation/download)
+选 **aarch64（Apple Silicon）** 的 Live ISO。当前稳定版 F44（F45 正式版 10/20 发布，发布后直接换新版）。
+⚠️ 必须是 aarch64——下成 x86_64 会无法启动或慢到不可用。
+
+**第 2 步：建虚拟机**
+
+*VMware Fusion*（免费版需在 Broadcom Support Portal 注册账号下载）：
+- File → New → Install from disc or image → 选 ISO；
+- ⚠️ 客户机操作系统必须选 Linux → **Fedora 64-bit ARM**。若自动识别成了 x86 的
+  "Fedora 64-bit"，务必手动改，否则 Fusion 会走全模拟（慢到不可用）；
+- Finish 前 Customize Settings：内存 8G、CPU 4 核、磁盘 40G；
+  Graphics 勾选 **Accelerate 3D graphics**（Fusion 对 ARM Linux 有 3D 支持，niri 比
+  软渲染流畅得多）。
+
+*UTM*（[mac.getutm.app](https://mac.getutm.app)）：
+- 新建 → **Virtualize**（不要选 Emulate，那是跨架构模拟）→ Linux → 挂 ISO；
+- 内存 ≥ 4G（建议 8G）、CPU ≥ 4、磁盘 ≥ 32G，显示保持默认 VirtIO GPU。
+
+**第 3 步：装系统（通用）**
+启动进 Live 桌面 → "Install to Hard Drive"（Anaconda）：语言/键盘 →
+Installation Destination 选整块虚拟盘 → 设用户密码 → 开始安装。
+装完重启前**断开/清空 CD/DVD 的 ISO**（Fusion 一般自动弹出；UTM 需手动清空），否则又进 Live。
+
+**第 4 步：首次进入 GNOME 后**
+
+*VMware Fusion*（装 VMware Tools，剪贴板共享与自适应分辨率靠它）：
+```bash
+sudo dnf upgrade -y && sudo systemctl reboot   # 先把内核更到最新再干活
+sudo dnf install -y open-vm-tools open-vm-tools-desktop
+sudo systemctl enable --now vmtoolsd            # 装完注销重登生效
+```
+
+*UTM*：
+```bash
+sudo dnf upgrade -y && sudo systemctl reboot
+sudo dnf install -y spice-vdagent               # 剪贴板共享，装完注销重登生效
+```
+
+**第 5 步：把仓库弄进 VM**（三选一）：
+- 有 GitHub 远端：VM 里直接 `git clone`；
+- rsync：VM 里 `sudo systemctl enable --now sshd`。
+  Fusion 的默认 NAT（Share with my Mac）**允许 Mac 直连 VM 的 IP**：VM 里
+  `ip addr` 查地址后，Mac 上直接
+  `rsync -av --exclude node_modules --exclude dist ~/codespace/AgentOS/ <vm用户>@<VM_IP>:~/AgentOS/`。
+  （UTM 的 Shared 网络不行，需在 VM 设置加端口转发 Host 2222 → Guest 22，然后
+  `rsync -av -e "ssh -p 2222" ... 用户@localhost:~/AgentOS/`）
+  （Fusion 还有 Sharing → 共享文件夹可选，guest 里挂 `/mnt/hgfs`）
+- 临时 HTTP：Mac 上 `cd ~/codespace/AgentOS && python3 -m http.server 8000`，
+  VM 里 `wget` 拉一份。
+
+**第 6 步：跑安装器**（走 install.sh 的 dnf 分支）：
+```bash
+cd ~/AgentOS && ./os/install.sh --with-goose
+```
+
+**第 7 步：进 niri 会话**：niri 包自带 wayland-session 文件。先加通知守护进程自启，然后注销，
+GDM 登录界面右下角齿轮选 **Niri**，登录：
+```bash
+mkdir -p ~/.config/niri
+echo 'spawn-at-startup "mako"' >> ~/.config/niri/config.kdl
+```
+（niri 没有配置文件也能跑，这行只为拉起 mako）
+
+之后从 §3 的 L1 开始逐层验证。
 
 
 
@@ -219,6 +246,8 @@ goose session
 | `无法启动 niri`（isError） | PATH 里没有 niri，用 `NIRI_MSG_BIN=/usr/bin/niri` 指定绝对路径 |
 | VM 里 niri 黑屏/崩溃 | 虚拟显卡未开 3D 加速：virtio-gpu + `virtio=gl`（virt-manager 勾选 3D），VMware 开 3D 加速 |
 | UTM 里 niri 动画略钝 | aarch64 VM 走 llvmpipe 软渲染，窗口操作可用即可，验证不依赖 GPU 性能；要真 3D 加速换 Parallels/Fusion 或 x86_64 真机 |
+| Fusion 里 VM 极慢/起不来 | 客户机类型选错：必须是 Linux → Fedora 64-bit **ARM**，选成 x86 的 "Fedora 64-bit" 会走全模拟，删掉重建 |
+| Fusion 剪贴板/分辨率不自适应 | `open-vm-tools-desktop` 装了吗？`systemctl status vmtoolsd`；装完要注销重登 |
 | 装错 x86_64 ISO | 重下 aarch64 镜像（文件名含 `aarch64`）；Apple Silicon 上 x86_64 只能全模拟，不可用 |
 | UTM 剪贴板不通 | VM 里 `sudo dnf install spice-vdagent` 后注销重登 |
 | GDM 会话列表没有 Niri | 确认 niri 已装：`ls /usr/share/wayland-sessions/` 应有 niri.desktop |

@@ -61,7 +61,7 @@ describe("动作命令", () => {
       "msg",
       "action",
       "move-window-to-workspace",
-      "--id",
+      "--window-id",
       "3",
       "5",
     ]);

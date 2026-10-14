@@ -37,7 +37,10 @@ export class NiriClient {
   }
 
   async moveWindowToWorkspace(id: number | undefined, reference: string): Promise<void> {
-    const args = id === undefined ? [reference] : ["--id", String(id), reference];
+    // 注意：niri 各 action 的 id 参数名不一致——move-window-to-workspace 用
+    // --window-id（实测 26.04），focus-window/close-window 用 --id
+    const args =
+      id === undefined ? [reference] : ["--window-id", String(id), reference];
     await this.action("move-window-to-workspace", args);
   }
 

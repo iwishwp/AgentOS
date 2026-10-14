@@ -49,6 +49,7 @@ try {
 // 注意 app_id 的大小写由应用自报（Alacritty 是大写开头），统一小写再比
 const target = wins.find((w) => String(w.app_id ?? "").toLowerCase().includes("alacritty"));
 if (!target) {
+  failed++;
   console.log("\n!! alacritty 窗口未出现，检查 spawn 是否成功");
 } else {
   console.log(`\nalacritty 窗口 id=${target.id} title=${JSON.stringify(target.title)}`);
@@ -56,8 +57,10 @@ if (!target) {
     name: "move_window_to_workspace",
     arguments: { id: target.id, reference: "2" },
   });
+  if (mv.isError) failed++;
   console.log("move:", textOf(mv), "isError=", mv.isError === true);
   const cl = await client.callTool({ name: "close_window", arguments: { id: target.id } });
+  if (cl.isError) failed++;
   console.log("close:", textOf(cl), "isError=", cl.isError === true);
 }
 

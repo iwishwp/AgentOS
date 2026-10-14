@@ -9,6 +9,35 @@ curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download
 goose configure   # 配置模型 provider
 ```
 
+## 接入 GLM（OpenAI 兼容端点，国内直连）
+
+goose 1.54 实测（2026-10，aarch64 VM）。`~/.config/goose/config.yaml`：
+
+```yaml
+GOOSE_PROVIDER: openai
+GOOSE_MODEL: glm-5.3-flash
+```
+
+密钥与端点放 `~/.config/agentos/goose.env`（权限 600，不进 git）：
+
+```bash
+OPENAI_API_KEY=<你的key>
+OPENAI_BASE_URL=https://open.bigmodel.cn        # 只能是主机部分！
+OPENAI_BASE_PATH=/api/paas/v4/chat/completions  # 完整路径放这里
+```
+
+**URL 拼接的三个坑（实测）**：
+1. 用 `OPENAI_HOST=https://open.bigmodel.cn/api/paas/v4` → goose 追加 `/v1/chat/completions` 得到 404（它对非 `/v1` 结尾的 host 强拼 v1）；
+2. `OPENAI_BASE_URL` 带 `/api/paas/v4` 路径 → 路径被丢弃（405，只剩主机 + BASE_PATH）；
+3. 正确姿势 = BASE_URL 只给主机，BASE_PATH 给全路径。
+
+模型选择：`glm-5.3-flash` 实测可用且便宜（带思考，工具调用走 function calling）；
+`glm-5.3-flashx` 更快但同样计费；API 报错提示里的 `glm-4.5-air:free` 实际不存在。
+最小验证：`goose run -t "只回复两个字:收到"`。
+
+> 本机网络到 GitHub release 被重置时，在 Mac 下载
+> `goose-aarch64-unknown-linux-gnu.tar.gz` 后 `scp` 进 VM 安装。
+
 ## 前置条件
 
 - 在 niri 会话内运行（`niri msg` 依赖 `NIRI_SOCKET` 环境变量指向 niri 的 IPC socket）；

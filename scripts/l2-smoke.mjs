@@ -38,7 +38,7 @@ for (const t of ["list_windows", "list_workspaces", "list_outputs"]) {
 
 // 生命周期：开 alacritty → 移动 → 关闭
 await client.callTool({ name: "open_app", arguments: { command: ["alacritty"] } });
-await sleep(2000);
+await sleep(3000);
 let wins = [];
 try {
   wins = JSON.parse(textOf(await client.callTool({ name: "list_windows", arguments: {} })));
@@ -46,7 +46,8 @@ try {
   failed++;
   console.log("\n!! list_windows 返回的不是 JSON，前面的查询应该已经报错");
 }
-const target = wins.find((w) => String(w.app_id ?? "").includes("alacritty"));
+// 注意 app_id 的大小写由应用自报（Alacritty 是大写开头），统一小写再比
+const target = wins.find((w) => String(w.app_id ?? "").toLowerCase().includes("alacritty"));
 if (!target) {
   console.log("\n!! alacritty 窗口未出现，检查 spawn 是否成功");
 } else {

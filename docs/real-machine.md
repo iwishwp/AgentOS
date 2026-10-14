@@ -277,19 +277,31 @@ goose session
 | 现象 | 原因与处理 |
 |---|---|
 | `echo $NIRI_SOCKET` 为空 | 不在 niri 会话内（SSH/TTY 另一会话）。在 niri 内的终端跑；或手动 `export NIRI_SOCKET=$(ls /run/user/$(id -u)/niri.*.socket | head -1)` |
+| SSH 里跑 `niri msg`/`wl-copy`/`notify-send` 报环境错 | SSH 会话不带图形会话环境，需手动导出：`NIRI_SOCKET=$(ls /run/user/$(id -u)/niri.*.sock | head -1)`、`WAYLAND_DISPLAY=wayland-1`、`DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus` |
+| MCP 客户端拉起 niri-mcp 后报 NIRI_SOCKET is not set | MCP SDK 的 stdio 客户端默认只透传白名单环境变量（HOME/PATH/USER 等），必须显式传 env（见 `scripts/l2-smoke.mjs` 注释；goose 侧在扩展配置的 `envs` 里传） |
 | `无法启动 niri`（isError） | PATH 里没有 niri，用 `NIRI_MSG_BIN=/usr/bin/niri` 指定绝对路径 |
-| VM 里 niri 黑屏/崩溃 | 虚拟显卡未开 3D 加速：virtio-gpu + `virtio=gl`（virt-manager 勾选 3D），VMware 开 3D 加速 |
+| VM 里 niri 黑屏/卡登录 | 日志有 `VMware: No 3D enabled` / `failed to initialize renderer`：niri 是 GLES 合成器**无软件渲染回退**，Fusion 必须勾选 Accelerate 3D graphics（GNOME 能进不代表 3D 开了） |
+| GDM 找不到会话齿轮 | 齿轮在**点选用户名之后**才出现（输密码框旁） |
+| `niri msg action ...` 参数错 | niri 各 action 参数名不一致：`move-window-to-workspace` 用 `--window-id`，`focus-window`/`close-window` 用 `--id`（26.04 实测）；以 `niri msg action <名字> --help` 为准 |
+| VM 里 curl GitHub release 被重置 | 网络环境问题：在 Mac 下载二进制后 `scp` 推入（goose 即此法安装） |
 | UTM 里 niri 动画略钝 | aarch64 VM 走 llvmpipe 软渲染，窗口操作可用即可，验证不依赖 GPU 性能；要真 3D 加速换 Parallels/Fusion 或 x86_64 真机 |
 | Fusion 里 VM 极慢/起不来 | 客户机类型选错：必须是 Linux → Fedora 64-bit **ARM**，选成 x86 的 "Fedora 64-bit" 会走全模拟，删掉重建 |
 | Fusion 剪贴板/分辨率不自适应 | `open-vm-tools-desktop` 装了吗？`systemctl status vmtoolsd`；装完要注销重登 |
 | 装错 x86_64 ISO | 重下 aarch64 镜像（文件名含 `aarch64`）；Apple Silicon 上 x86_64 只能全模拟，不可用 |
 | UTM 剪贴板不通 | VM 里 `sudo dnf install spice-vdagent` 后注销重登 |
 | GDM 会话列表没有 Niri | 确认 niri 已装：`ls /usr/share/wayland-sessions/` 应有 niri.desktop |
-| `niri msg action ...` 参数错 | niri 版本差异，以 `niri msg action <名字> --help` 为准，回修 `src/niri.ts` |
+| firewalld 拦 SSH 表现为 "No route to host" | 不是路由问题！`sudo firewall-cmd --add-service=ssh --permanent && sudo firewall-cmd --reload`（ARP 能通而 TCP 被拒即此症） |
 | npm install 慢/失败 | 换镜像：`npm config set registry https://registry.npmmirror.com`（国内环境） |
 
 ## 实测记录
 
 - 2026-10-13 文档定稿；官方文档核对：`--json` 在子命令前、`niri-session` 启动方式、`NIRI_SOCKET` 语义均已确认，待真机回填。
 - 2026-10-13 新增 Apple Silicon（aarch64）路径：CachyOS 无 ARM 镜像（官方确认），冒烟走 Fedora aarch64 + niri 官方包 + COPR 的 xwayland-satellite；goose 官方支持 arm64。
-- 2026-10-13 新增 §0.2 UTM 安装 Fedora Workstation 分步指南（Workstation aarch64 Live ISO 自 F35 起官方提供）；待今晚实测回填。
+- 2026-10-13 新增 §0.2 UTM/VMware Fusion 安装指南（Workstation aarch64 Live ISO 自 F35 起官方提供）。
+- **2026-10-14 真机实测通过（Fedora 44 aarch64 @ VMware Fusion，SSH 远程驱动）**：
+  - **L1 ✅**：`--json windows/workspaces/outputs` 结构与封装一致；`focus-workspace` 引用语法 = 序号或名称；
+  - **L2 ✅**：`scripts/l2-smoke.mjs` 全链路零失败——8 工具注册、查询真数据、开/移/关 Alacritty 全通过（修复 `--window-id` 后）；
+  - **desktop 链路 ✅**：notify-send（mako）+ wl-copy/wl-paste 读写回环；
+  - **实测发现并已修复 3 个问题**：① `move-window-to-workspace` 参数为 `--window-id`（非 `--id`）；② MCP SDK stdio 客户端 env 白名单丢弃 `NIRI_SOCKET`（smoke 脚本显式透传 env）；③ 窗口 `app_id` 大小写由应用自报（"Alacritty"），匹配需不区分大小写；
+  - **环境教训**：Fusion 必须开 3D 加速（niri 无软件渲染回退，症状为黑屏卡登录）；firewalld 拒绝表现为 "No route to host"；VM 直连 GitHub release 被重置，goose 走 Mac 中转 scp 安装；
+  - **基座评估数据**：F44 仓库 niri 26.04（落后上游约一个小版本）；F44 updates 内核 6.19 → 7.2.10 rebase（Fedora 版内内核跟进策略实证）。

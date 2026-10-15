@@ -11,7 +11,9 @@
 
 1. 所有任务产物（文档/报告/数据文件）统一写入工作区（files 扩展的沙箱，`~/Agent/`），按
    `downloads/ inbox/ reports/ notes/` 分类组织，不要散落；
-2. 呈现给用户：外发格式（docx/odt/pdf）或文件用 `desktop__open` 打开；网页内容才用浏览器；
+2. 呈现给用户：文档类文件用 `desktop__open` 打开——**office 文档（fodt/docx/odt 等）要带
+   `app: libreoffice` 参数**（系统 MIME 关联不可靠，实测 Fedora 把 fodt 识别成 text/xml）；
+   网页内容才用浏览器；
 3. 任务完成、失败、或需要用户决策时，用 `desktop__notify` 发通知（标题一句话说清结论）。
 
 ## 分寸

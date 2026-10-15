@@ -43,11 +43,12 @@ elif command -v pacman >/dev/null 2>&1; then
   sudo pacman -Sy --needed niri xwayland-satellite \
     xdg-desktop-portal-gnome xdg-desktop-portal-gtk \
     alacritty fuzzel wl-clipboard libnotify mako \
+    libreoffice-fresh \
     nodejs npm git
 elif command -v dnf >/dev/null 2>&1; then
   echo "== 安装系统包（dnf）=="
   sudo dnf install -y niri xdg-desktop-portal-gnome xdg-desktop-portal-gtk \
-    alacritty fuzzel wl-clipboard libnotify mako nodejs npm git
+    alacritty fuzzel wl-clipboard libnotify mako libreoffice-writer nodejs npm git
   echo "提示: xwayland-satellite 不在 Fedora 官方仓库，如需 X11 应用支持："
   echo "  sudo dnf copr enable avengemedia/dms && sudo dnf install xwayland-satellite"
 else

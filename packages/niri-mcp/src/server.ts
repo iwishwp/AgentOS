@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { CommandRunner } from "@agentos/proc";
 import { ShellRunner } from "@agentos/proc";
+import { Policy, audit } from "@agentos/policy";
 import { NiriClient, NiriError } from "./niri.js";
 
 const windowId = z.number().int().describe("窗口 id（来自 list_windows 的 id 字段）");
@@ -22,11 +23,30 @@ async function guard(fn: () => Promise<ToolOk>): Promise<ToolResult> {
   }
 }
 
-export function buildServer(runner: CommandRunner = new ShellRunner()): McpServer {
+const EXT = "niri";
+
+export function buildServer(
+  runner: CommandRunner = new ShellRunner(),
+  policy: Policy = Policy.load(),
+): McpServer {
   const server = new McpServer({ name: "niri-mcp", version: "0.1.0" });
   const niri = new NiriClient(runner);
 
-  server.registerTool(
+  // 统一注册入口：先过策略（allow/deny + 审计），再进 handler
+  const t = ((name: string, config: Parameters<McpServer["registerTool"]>[1], cb: any) =>
+    server.registerTool(name, config, async (args: unknown) => {
+      const verdict = policy.decide(EXT, name);
+      audit({ ts: new Date().toISOString(), extension: EXT, tool: name, decision: verdict.decision });
+      if (verdict.decision === "deny") {
+        return {
+          content: [{ type: "text" as const, text: `策略拒绝 ${EXT}.${name}（${verdict.reason}）。可在 ~/.config/agentos/policy.yaml 调整。` }],
+          isError: true,
+        };
+      }
+      return cb(args);
+    })) as McpServer["registerTool"];
+
+  t(
     "list_windows",
     {
       title: "列出窗口",
@@ -37,7 +57,7 @@ export function buildServer(runner: CommandRunner = new ShellRunner()): McpServe
       guard(async () => text(JSON.stringify(await niri.windows(), null, 2))),
   );
 
-  server.registerTool(
+  t(
     "list_workspaces",
     {
       title: "列出工作区",
@@ -47,7 +67,7 @@ export function buildServer(runner: CommandRunner = new ShellRunner()): McpServe
       guard(async () => text(JSON.stringify(await niri.workspaces(), null, 2))),
   );
 
-  server.registerTool(
+  t(
     "list_outputs",
     {
       title: "列出输出器",
@@ -57,7 +77,7 @@ export function buildServer(runner: CommandRunner = new ShellRunner()): McpServe
       guard(async () => text(JSON.stringify(await niri.outputs(), null, 2))),
   );
 
-  server.registerTool(
+  t(
     "focus_window",
     {
       title: "聚焦窗口",
@@ -71,7 +91,7 @@ export function buildServer(runner: CommandRunner = new ShellRunner()): McpServe
       }),
   );
 
-  server.registerTool(
+  t(
     "focus_workspace",
     {
       title: "切换工作区",
@@ -85,7 +105,7 @@ export function buildServer(runner: CommandRunner = new ShellRunner()): McpServe
       }),
   );
 
-  server.registerTool(
+  t(
     "move_window_to_workspace",
     {
       title: "移动窗口到工作区",
@@ -99,7 +119,7 @@ export function buildServer(runner: CommandRunner = new ShellRunner()): McpServe
       }),
   );
 
-  server.registerTool(
+  t(
     "close_window",
     {
       title: "关闭窗口",
@@ -113,7 +133,7 @@ export function buildServer(runner: CommandRunner = new ShellRunner()): McpServe
       }),
   );
 
-  server.registerTool(
+  t(
     "open_app",
     {
       title: "启动应用",

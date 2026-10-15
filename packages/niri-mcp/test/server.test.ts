@@ -1,8 +1,11 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { FakeRunner } from "@agentos/proc/testing";
+import { Policy } from "@agentos/policy";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildServer } from "../src/server.js";
+
+process.env.AGENTOS_AUDIT_PATH = "/tmp/agentos-test-audit.jsonl";
 
 const TOOL_NAMES = [
   "list_windows",
@@ -80,5 +83,16 @@ describe("MCP 工具面", () => {
     });
     expect(r.isError).toBe(true);
     expect(textOf(r)).toContain("focus-workspace");
+  });
+
+  it("策略 deny 的工具被拒且不触碰 niri", async () => {
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    await buildServer(runner, Policy.fromRules({ niri: { close_window: "deny" } })).connect(st);
+    const c = new Client({ name: "t", version: "0" });
+    await c.connect(ct);
+    const r = await c.callTool({ name: "close_window", arguments: { id: 1 } });
+    expect(r.isError).toBe(true);
+    expect(textOf(r)).toContain("策略拒绝");
+    expect(runner.calls).toHaveLength(0);
   });
 });

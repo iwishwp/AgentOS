@@ -6,6 +6,7 @@ export class FilesError extends Error {}
 
 const MAX_READ_BYTES = 1024 * 1024;
 const MAX_WALK_ENTRIES = 10_000;
+const MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024;
 
 /**
  * 沙箱化工作区（默认 ~/Agent，可用 AGENTOS_WORKSPACE 覆盖）。
@@ -95,6 +96,32 @@ export class Workspace {
       }
     }
     return hits;
+  }
+
+  /** 下载 http(s) 资源到沙箱内（上限 50MB，60s 超时）。 */
+  async download(url: string, destRel: string): Promise<{ bytes: number; path: string }> {
+    if (!/^https?:\/\//.test(url)) {
+      throw new FilesError(`只支持 http/https URL: ${url}`);
+    }
+    const dest = this.resolveInside(destRel);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    let res: Response;
+    try {
+      res = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(60_000) });
+    } catch (e) {
+      throw new FilesError(`下载失败: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (!res.ok) throw new FilesError(`下载失败 HTTP ${res.status}`);
+    const declared = Number(res.headers.get("content-length") ?? 0);
+    if (declared > MAX_DOWNLOAD_BYTES) {
+      throw new FilesError(`文件 ${declared} 字节超过下载上限 50MB`);
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length > MAX_DOWNLOAD_BYTES) {
+      throw new FilesError(`文件 ${buf.length} 字节超过下载上限 50MB`);
+    }
+    fs.writeFileSync(dest, buf);
+    return { bytes: buf.length, path: dest };
   }
 
   /** 核心安全检查：解析到 root 内部的真实路径，越界即拒。 */

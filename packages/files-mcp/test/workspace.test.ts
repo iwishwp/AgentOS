@@ -59,6 +59,48 @@ describe("沙箱越界防护（核心安全测试）", () => {
   });
 });
 
+describe("下载", () => {
+  it("从本地 http 服务下载到沙箱", async () => {
+    const { createServer } = await import("node:http");
+    const srv = createServer((req, res) => {
+      res.writeHead(200, { "content-type": "text/plain" });
+      res.end("downloaded content 中文");
+    });
+    await new Promise<void>((r) => srv.listen(0, "127.0.0.1", r));
+    const port = (srv.address() as { port: number }).port;
+    try {
+      const w = ws();
+      const r = await w.download(`http://127.0.0.1:${port}/a.txt`, "downloads/a.txt");
+      expect(r.bytes).toBeGreaterThan(0);
+      expect(w.readFile("downloads/a.txt")).toContain("downloaded content");
+    } finally {
+      srv.close();
+    }
+  });
+
+  it("非 http(s) 协议被拒", async () => {
+    const w = ws();
+    await expect(w.download("file:///etc/passwd", "x")).rejects.toThrow(/http/);
+    await expect(w.download("ftp://example.com/x", "x")).rejects.toThrow(/http/);
+  });
+
+  it("HTTP 404 报错", async () => {
+    const { createServer } = await import("node:http");
+    const srv = createServer((_, res) => {
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((r) => srv.listen(0, "127.0.0.1", r));
+    const port = (srv.address() as { port: number }).port;
+    try {
+      const w = ws();
+      await expect(w.download(`http://127.0.0.1:${port}/x`, "x")).rejects.toThrow(/404/);
+    } finally {
+      srv.close();
+    }
+  });
+});
+
 describe("目录与移动", () => {
   it("createDir 后 move 重命名", () => {
     const w = ws();

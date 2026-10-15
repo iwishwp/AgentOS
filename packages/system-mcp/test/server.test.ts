@@ -2,6 +2,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { FakeRunner } from "@agentos/proc/testing";
 import { beforeEach, describe, expect, it } from "vitest";
+
+process.env.AGENTOS_AUDIT_PATH = "/tmp/agentos-test-audit.jsonl";
 import { buildServer } from "../src/server.js";
 
 let runner: FakeRunner;

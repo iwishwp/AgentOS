@@ -19,7 +19,8 @@
   "dependencies": {
     "@agentos/proc": "*",
     "@modelcontextprotocol/sdk": "^1.32.1",
-    "zod": "^4.6.6"
+    "zod": "^4.6.6",
+    "@agentos/policy": "*"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

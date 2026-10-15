@@ -5,6 +5,8 @@ import { mkdtempSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { beforeEach, describe, expect, it } from "vitest";
+
+process.env.AGENTOS_AUDIT_PATH = "/tmp/agentos-test-audit.jsonl";
 import { buildServer } from "../src/server.js";
 import { Workspace } from "../src/workspace.js";
 
@@ -26,11 +28,12 @@ function textOf(result: { content: unknown }): string {
 }
 
 describe("MCP 工具面", () => {
-  it("注册 7 个工具", async () => {
+  it("注册 8 个工具", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       "create_dir",
       "delete",
+      "download",
       "find_by_name",
       "list_dir",
       "move",

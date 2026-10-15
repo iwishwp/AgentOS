@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { CommandRunner } from "@agentos/proc";
 import { ShellRunner } from "@agentos/proc";
+import { Policy, audit } from "@agentos/policy";
 import { DesktopClient, DesktopError } from "./desktop.js";
 
 type ToolOk = { content: [{ type: "text"; text: string }] };
@@ -21,11 +22,30 @@ function text(t: string): ToolOk {
   return { content: [{ type: "text", text: t }] };
 }
 
-export function buildServer(runner: CommandRunner = new ShellRunner()): McpServer {
+const EXT = "desktop";
+
+export function buildServer(
+  runner: CommandRunner = new ShellRunner(),
+  policy: Policy = Policy.load(),
+): McpServer {
   const server = new McpServer({ name: "desktop-mcp", version: "0.1.0" });
   const desktop = new DesktopClient(runner);
 
-  server.registerTool(
+  // 统一注册入口：先过策略（allow/deny + 审计），再进 handler
+  const t = ((name: string, config: Parameters<McpServer["registerTool"]>[1], cb: any) =>
+    server.registerTool(name, config, async (args: unknown) => {
+      const verdict = policy.decide(EXT, name);
+      audit({ ts: new Date().toISOString(), extension: EXT, tool: name, decision: verdict.decision });
+      if (verdict.decision === "deny") {
+        return {
+          content: [{ type: "text" as const, text: `策略拒绝 ${EXT}.${name}（${verdict.reason}）。可在 ~/.config/agentos/policy.yaml 调整。` }],
+          isError: true,
+        };
+      }
+      return cb(args);
+    })) as McpServer["registerTool"];
+
+  t(
     "open",
     {
       title: "打开目标",
@@ -42,7 +62,7 @@ export function buildServer(runner: CommandRunner = new ShellRunner()): McpServe
       }),
   );
 
-  server.registerTool(
+  t(
     "notify",
     {
       title: "桌面通知",
@@ -70,7 +90,7 @@ export function buildServer(runner: CommandRunner = new ShellRunner()): McpServe
       }),
   );
 
-  server.registerTool(
+  t(
     "clipboard_read",
     {
       title: "读剪贴板",
@@ -83,7 +103,7 @@ export function buildServer(runner: CommandRunner = new ShellRunner()): McpServe
       }),
   );
 
-  server.registerTool(
+  t(
     "clipboard_write",
     {
       title: "写剪贴板",

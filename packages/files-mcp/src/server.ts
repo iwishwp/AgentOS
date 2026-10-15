@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { Policy, audit } from "@agentos/policy";
 import { FilesError, Workspace } from "./workspace.js";
 
 type ToolOk = { content: [{ type: "text"; text: string }] };
@@ -20,10 +21,25 @@ function text(t: string): ToolOk {
 
 const relPath = z.string().min(1).describe("相对工作区根目录的路径（~/Agent）");
 
-export function buildServer(ws = new Workspace()): McpServer {
+export function buildServer(ws = new Workspace(), policy: Policy = Policy.load()): McpServer {
   const server = new McpServer({ name: "files-mcp", version: "0.1.0" });
 
-  server.registerTool(
+  // 统一注册入口：先过策略（allow/deny + 审计），再进 handler
+  const EXT = "files";
+  const t = ((name: string, config: Parameters<McpServer["registerTool"]>[1], cb: any) =>
+    server.registerTool(name, config, async (args: unknown) => {
+      const verdict = policy.decide(EXT, name);
+      audit({ ts: new Date().toISOString(), extension: EXT, tool: name, decision: verdict.decision });
+      if (verdict.decision === "deny") {
+        return {
+          content: [{ type: "text" as const, text: `策略拒绝 ${EXT}.${name}（${verdict.reason}）。可在 ~/.config/agentos/policy.yaml 调整。` }],
+          isError: true,
+        };
+      }
+      return cb(args);
+    })) as McpServer["registerTool"];
+
+  t(
     "list_dir",
     {
       title: "列目录",
@@ -33,7 +49,7 @@ export function buildServer(ws = new Workspace()): McpServer {
     async ({ path: p }) => guard(async () => text(ws.listDir(p ?? "."))),
   );
 
-  server.registerTool(
+  t(
     "read_file",
     {
       title: "读文件",
@@ -47,7 +63,7 @@ export function buildServer(ws = new Workspace()): McpServer {
       guard(async () => text(ws.readFile(p, maxBytes))),
   );
 
-  server.registerTool(
+  t(
     "write_file",
     {
       title: "写文件",
@@ -61,7 +77,7 @@ export function buildServer(ws = new Workspace()): McpServer {
       guard(async () => text(`已写入 ${p}（${ws.writeFile(p, content)} 字节）`)),
   );
 
-  server.registerTool(
+  t(
     "create_dir",
     {
       title: "建目录",
@@ -74,7 +90,7 @@ export function buildServer(ws = new Workspace()): McpServer {
     }),
   );
 
-  server.registerTool(
+  t(
     "move",
     {
       title: "移动/重命名",
@@ -88,7 +104,7 @@ export function buildServer(ws = new Workspace()): McpServer {
       }),
   );
 
-  server.registerTool(
+  t(
     "delete",
     {
       title: "删除（进回收站）",
@@ -99,7 +115,24 @@ export function buildServer(ws = new Workspace()): McpServer {
       guard(async () => text(`已移入回收站: ${ws.delete(p)}`)),
   );
 
-  server.registerTool(
+  t(
+    "download",
+    {
+      title: "下载文件",
+      description: "下载 http/https 资源保存到工作区（上限 50MB，60 秒超时）。URL 必须以 http(s):// 开头。",
+      inputSchema: {
+        url: z.string().url().describe("下载地址"),
+        path: relPath.describe("保存到工作区的相对路径"),
+      },
+    },
+    async ({ url, path: p }) =>
+      guard(async () => {
+        const r = await ws.download(url, p);
+        return text(`已下载 ${p}（${r.bytes} 字节）`);
+      }),
+  );
+
+  t(
     "find_by_name",
     {
       title: "按名称查找",

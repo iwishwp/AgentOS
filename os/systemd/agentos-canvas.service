@@ -1,0 +1,19 @@
+# AgentOS canvas 服务（生成式 UI 本地托管）
+# 安装：
+#   cp agentos-canvas.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now agentos-canvas
+# 自检：curl -s http://127.0.0.1:7788/ | head
+[Unit]
+Description=AgentOS canvas server (local generative UI host, 127.0.0.1 only)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/node %h/AgentOS/packages/canvas/dist/index.js
+Environment=AGENTOS_CANVAS_ROOT=%h/Agent/canvas
+Environment=AGENTOS_CANVAS_PORT=7788
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical-session.target

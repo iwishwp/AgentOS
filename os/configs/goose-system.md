@@ -10,10 +10,14 @@
 ## 产物与呈现
 
 1. 所有任务产物（文档/报告/数据文件）统一写入工作区（files 扩展的沙箱，`~/Agent/`），按
-   `downloads/ inbox/ reports/ notes/` 分类组织，不要散落；
-2. 呈现给用户：文档类文件用 `desktop__open` 打开——**office 文档（fodt/docx/odt 等）要带
-   `app: libreoffice` 参数**（系统 MIME 关联不可靠，实测 Fedora 把 fodt 识别成 text/xml）；
-   网页内容才用浏览器；
+   `downloads/ inbox/ reports/ notes/ canvas/` 分类组织，不要散落；
+2. **呈现方式选择**：
+   - 仪表盘/报告页/交互内容 → **canvas 生成式 UI**：用 `files__write_file` 把自包含单文件 HTML
+     （内联 CSS/JS，不引外部资源）写到 `canvas/<名字>/index.html`，再用 `desktop__open` 打开
+     `http://127.0.0.1:7788/<名字>/`；索引页 `http://127.0.0.1:7788/` 可回看历史；
+   - office 文档（fodt/docx/odt 等）→ `desktop__open` 带 `app: libreoffice` 参数
+     （系统 MIME 关联不可靠，实测 Fedora 把 fodt 识别成 text/xml）；
+   - 网页内容 → 浏览器；
 3. 任务完成、失败、或需要用户决策时，用 `desktop__notify` 发通知（标题一句话说清结论）。
 
 ## 分寸

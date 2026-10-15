@@ -18,7 +18,7 @@ Coding plan 的资源包**不在** OpenAI 兼容端点上（`/api/paas/v4` 会�
 `~/.config/goose/config.yaml`：
 ```yaml
 GOOSE_PROVIDER: anthropic
-GOOSE_MODEL: glm-5.3
+GOOSE_MODEL: glm-5.3-flash   # 或 glm-5.3；套餐内模型在 Anthropic 端点均走 plan 额度
 ```
 
 `~/.config/agentos/goose.env`（权限 600）：
@@ -28,6 +28,8 @@ ANTHROPIC_HOST=https://open.bigmodel.cn/api/anthropic
 ```
 
 goose 的 anthropic provider 会拼 `ANTHROPIC_HOST + /v1/messages`，实测通过（2026-10）。
+`glm-5.3-flash` 在此端点同样走套餐额度且工具调用正常（实测）；"余额不足"只出现在
+OpenAI 兼容端点——套餐额度不覆盖那条路，与模型无关。
 
 ### 路径 B：按量付费 key —— OpenAI 兼容端点
 

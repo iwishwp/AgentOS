@@ -1,0 +1,24 @@
+{
+  "name": "@agentos/canvas",
+  "version": "0.1.0",
+  "description": "Local canvas server: serves agent-generated HTML artifacts from ~/Agent/canvas with an index page",
+  "type": "module",
+  "license": "Apache-2.0",
+  "bin": {
+    "agentos-canvas": "dist/index.js"
+  },
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "vitest run",
+    "start": "node dist/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.4"
+  }
+}

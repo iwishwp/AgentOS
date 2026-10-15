@@ -57,16 +57,20 @@ app=libreoffice，窗口验证 soffice 26.2）→ 通知"。意外收获：给�
 
 退出标准：不碰键盘鼠标，纯对话完成"下载文件 → 整理到工作区 → 生成一份文档 → 调起 LibreOffice 展示"。**已达成。**
 
-## M2 呈现层
+## M2 呈现层（进行中 · 核心已通）
 
 **目标**：agent 决定“怎么给用户看”，确立 artifacts 产品概念。
 
 范围：
 
-- artifacts 仓库：`~/Agent/works/` 落盘、任务索引、历史列表（聊天内可回看）；
-- `canvas`：本地 HTTP 服务 + webview 窗口，生成式 UI（HTML/React 模板）、WebSocket 增量更新、niri 窗口规则自动摆位；
-- office 链路打磨：文档模板、字体、中文排版检查（LibreOffice/WPS 双后端可配）；
-- 结果通知：完成/失败/需确认三类通知，带“查看产物”动作。
+- **canvas 本地服务**（`packages/canvas`）：安全静态托管 `~/Agent/canvas/` + 自动索引页，
+  仅绑 127.0.0.1；✅ **已落地并真机验证**（2026-10-15：agent 采集真实系统数据生成深色
+  仪表盘 → canvas 托管 → 浏览器呈现，生成式 UI 闭环打通）。systemd 单元
+  `os/systemd/agentos-canvas.service` 已部署；
+- artifacts 仓库：任务化索引与历史回看——canvas 索引页已覆盖 HTML 类；⬜ 全类型
+  artifacts（文件/报告）的统一索引待做；
+- 通知联动：完成/失败/需确认三类通知 + “查看产物”动作；⬜ 动作型通知待 mako 配置探索；
+- office 链路：✅ M1 已实证（fodt 生成 + LibreOffice 展示）。
 
 退出标准：所有任务产物统一进 artifacts 且可回看；外发格式与生成式 UI 两条呈现通道可用。
 

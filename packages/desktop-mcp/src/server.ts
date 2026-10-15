@@ -50,13 +50,21 @@ export function buildServer(
     {
       title: "打开目标",
       description:
-        "用系统默认应用打开一个目标：文件（docx/pptx/pdf 走 LibreOffice/WPS）、目录（文件管理器）或 URL（浏览器）。呈现结果给用户的首选方式。",
+        "用系统默认应用打开一个目标：文件（docx/pptx/pdf 走 LibreOffice/WPS）、目录（文件管理器）或 URL（浏览器）。呈现结果给用户的首选方式。MIME 关联不可靠时可传 app 指定应用（如 app: libreoffice）。",
       inputSchema: {
         target: z.string().min(1).describe("文件路径、目录或 URL"),
+        app: z
+          .string()
+          .optional()
+          .describe("指定应用别名（libreoffice/soffice），缺省走系统关联"),
       },
     },
-    async ({ target }) =>
+    async ({ target, app }) =>
       guard(async () => {
+        if (app) {
+          await desktop.openWith(app, target);
+          return text(`已用 ${app} 打开: ${target}`);
+        }
         await desktop.open(target);
         return text(`已打开: ${target}`);
       }),

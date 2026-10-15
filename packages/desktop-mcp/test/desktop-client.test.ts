@@ -14,7 +14,7 @@ function make() {
   return { runner, desktop: new DesktopClient(runner, BINS) };
 }
 
-describe("open（xdg-open）", () => {
+describe("open（xdg-open / 指定应用）", () => {
   it("目标作为唯一参数", async () => {
     const { runner, desktop } = make();
     runner.on(["/tmp/报告.docx"]);
@@ -26,6 +26,23 @@ describe("open（xdg-open）", () => {
     const { runner, desktop } = make();
     await expect(desktop.open("  ")).rejects.toThrow(DesktopError);
     expect(runner.calls).toHaveLength(0);
+  });
+
+  it("openWith：白名单别名走 detach 不等待退出", async () => {
+    const { desktop } = make();
+    const detached: { cmd: string; args: string[] }[] = [];
+    const d = new (desktop.constructor as any)(
+      new FakeRunner(),
+      BINS,
+      (cmd: string, args: string[]) => detached.push({ cmd, args }),
+    );
+    await d.openWith("libreoffice", "/tmp/a.fodt");
+    expect(detached).toEqual([{ cmd: "soffice", args: ["/tmp/a.fodt"] }]);
+  });
+
+  it("openWith：非白名单别名被拒", async () => {
+    const { desktop } = make();
+    await expect(desktop.openWith("rm", "/")).rejects.toThrow(DesktopError);
   });
 });
 

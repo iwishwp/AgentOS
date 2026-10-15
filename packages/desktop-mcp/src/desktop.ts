@@ -1,8 +1,23 @@
+import { spawn } from "node:child_process";
 import type { CommandRunner } from "@agentos/proc";
 
 export class DesktopError extends Error {}
 
 export type Urgency = "low" | "normal" | "critical";
+
+/** 后台拉起应用不等待（fire-and-forget），注入以便测试 */
+export type DetachFn = (cmd: string, args: string[]) => void;
+
+function defaultDetach(cmd: string, args: string[]): void {
+  const child = spawn(cmd, args, { stdio: "ignore", detached: true });
+  child.unref();
+}
+
+/** “指定应用打开”支持的别名（白名单，避免任意程序执行） */
+const OPEN_WITH_APPS: Record<string, string> = {
+  libreoffice: "soffice",
+  soffice: "soffice",
+};
 
 export interface DesktopBins {
   xdgOpen: string;
@@ -29,6 +44,7 @@ export class DesktopClient {
   constructor(
     private readonly runner: CommandRunner,
     private readonly bins: DesktopBins = defaultBins(),
+    private readonly detach: DetachFn = defaultDetach,
   ) {}
 
   async open(target: string): Promise<void> {
@@ -39,6 +55,18 @@ export class DesktopClient {
     if (r.code !== 0) {
       throw new DesktopError(`xdg-open 失败: ${describe(r)}（xdg-utils 装了吗？）`);
     }
+  }
+
+  /** 指定应用打开（白名单别名，如 libreoffice）。系统 MIME 关联不可靠时的兜底。 */
+  async openWith(app: string, target: string): Promise<void> {
+    const bin = OPEN_WITH_APPS[app];
+    if (!bin) {
+      throw new DesktopError(`不支持的应用别名: ${app}（支持: ${Object.keys(OPEN_WITH_APPS).join("/")}）`);
+    }
+    if (!target.trim()) {
+      throw new DesktopError("open 需要非空目标（文件路径/目录/URL）");
+    }
+    this.detach(bin, [target]);
   }
 
   async notify(

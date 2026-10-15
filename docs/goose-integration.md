@@ -9,31 +9,43 @@ curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download
 goose configure   # 配置模型 provider
 ```
 
-## 接入 GLM（OpenAI 兼容端点，国内直连）
+## 接入 GLM
 
-goose 1.54 实测（2026-10，aarch64 VM）。`~/.config/goose/config.yaml`：
+### 路径 A：Coding Plan 的 key（推荐，套餐内额度）—— Anthropic 兼容端点
+
+Coding plan 的资源包**不在** OpenAI 兼容端点上（`/api/paas/v4` 会报"余额不足"，即使套餐有额度）。走 Anthropic 兼容端点：
+
+`~/.config/goose/config.yaml`：
+```yaml
+GOOSE_PROVIDER: anthropic
+GOOSE_MODEL: glm-5.3
+```
+
+`~/.config/agentos/goose.env`（权限 600）：
+```bash
+ANTHROPIC_API_KEY=<coding-plan-key>
+ANTHROPIC_HOST=https://open.bigmodel.cn/api/anthropic
+```
+
+goose 的 anthropic provider 会拼 `ANTHROPIC_HOST + /v1/messages`，实测通过（2026-10）。
+
+### 路径 B：按量付费 key —— OpenAI 兼容端点
 
 ```yaml
 GOOSE_PROVIDER: openai
-GOOSE_MODEL: glm-5.3-flash
+GOOSE_MODEL: glm-5.3-flash   # flash 系列不在 coding plan 包内，仅按量付费可用
 ```
 
-密钥与端点放 `~/.config/agentos/goose.env`（权限 600，不进 git）：
-
 ```bash
-OPENAI_API_KEY=<你的key>
+OPENAI_API_KEY=<按量key>
 OPENAI_BASE_URL=https://open.bigmodel.cn        # 只能是主机部分！
 OPENAI_BASE_PATH=/api/paas/v4/chat/completions  # 完整路径放这里
 ```
 
 **URL 拼接的三个坑（实测）**：
-1. 用 `OPENAI_HOST=https://open.bigmodel.cn/api/paas/v4` → goose 追加 `/v1/chat/completions` 得到 404（它对非 `/v1` 结尾的 host 强拼 v1）；
-2. `OPENAI_BASE_URL` 带 `/api/paas/v4` 路径 → 路径被丢弃（405，只剩主机 + BASE_PATH）；
+1. `OPENAI_HOST=.../api/paas/v4` → goose 追加 `/v1/chat/completions` 得到 404（对非 `/v1` 结尾的 host 强拼 v1）；
+2. `OPENAI_BASE_URL` 带路径 → 路径被丢弃（405）；
 3. 正确姿势 = BASE_URL 只给主机，BASE_PATH 给全路径。
-
-模型选择：`glm-5.3-flash` 实测可用且便宜（带思考，工具调用走 function calling）；
-`glm-5.3-flashx` 更快但同样计费；API 报错提示里的 `glm-4.5-air:free` 实际不存在。
-最小验证：`goose run -t "只回复两个字:收到"`。
 
 > 本机网络到 GitHub release 被重置时，在 Mac 下载
 > `goose-aarch64-unknown-linux-gnu.tar.gz` 后 `scp` 进 VM 安装。
@@ -46,24 +58,35 @@ OPENAI_BASE_PATH=/api/paas/v4/chat/completions  # 完整路径放这里
 
 ## 挂载到 goose
 
-goose 的 MCP 扩展配置在 `~/.config/goose/config.yaml`（不同版本字段名略有差异，以
-`goose configure` 向导生成的格式为准）。两个 server 都挂上：
+goose 的 MCP 扩展配置在 `~/.config/goose/config.yaml`（1.54 实测通过的完整格式）：
 
 ```yaml
 extensions:
   niri:
     type: stdio
-    command: node
-    args:
-      - /path/to/AgentOS/packages/niri-mcp/dist/index.js
-    envs:
-      NIRI_SOCKET: ${NIRI_SOCKET}
+    name: niri            # 必填！缺了整条扩展被静默丢弃（实测踩坑）
+    enabled: true
+    cmd: /home/demon/AgentOS/scripts/env/with-niri-env.sh
+    args: []
+    env_keys: []
+    envs: {}
+    timeout: 300          # 单位是秒，不是毫秒
   desktop:
     type: stdio
-    command: node
-    args:
-      - /path/to/AgentOS/packages/desktop-mcp/dist/index.js
+    name: desktop
+    enabled: true
+    cmd: /home/demon/AgentOS/scripts/env/with-desktop-env.sh
+    args: []
+    env_keys: []
+    envs: {}
+    timeout: 300
 ```
+
+**排查要点（实测）**：
+- 扩展没生效时 goose **不报错**，只是工具不出现。验证方法：跑一次会话后
+  `grep -o '"name":"[a-z_]*"' ~/.local/state/goose/logs/llm_request.*.jsonl | grep niri`；
+- 启动器（`scripts/env/*.sh`）负责自动发现 `NIRI_SOCKET`（路径含 compositor PID，每次会话不同）和补齐 Wayland/dbus 环境，不要把 socket 路径硬编码进配置；
+- 手测启动器：`timeout 2 scripts/env/with-niri-env.sh </dev/null`，exit 0 即正常（stdin EOF 后干净退出）。
 
 或用向导添加：
 

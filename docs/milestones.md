@@ -7,7 +7,7 @@
 
 | 阶段 | 主题 | 估时 | 一句话退出标准 |
 |---|---|---|---|
-| **M0** | 奠基 | 1–2 周 | 一句话让 agent 开应用、摆窗口、报系统状态 |
+| **M0** | 奠基 | 1–2 周 | ✅ 一句话让 agent 开应用、摆窗口、报系统状态（2026-10-15 达成） |
 | **M1** | 系统工具面 | 2–4 周 | 全对话完成“下载→整理→生成文档→调起 LibreOffice” |
 | **M2** | 呈现层 | 3–4 周 | 任务产物统一进 artifacts 可回看；双通道呈现可用 |
 | **M3** | agent 会话 | 4–6 周 | agent 在独立 GUI 会话完成真实网页表单且不打扰用户 |
@@ -16,7 +16,7 @@
 
 ---
 
-## M0 奠基（进行中 · 真机验证已完成大半）
+## M0 奠基（✅ 2026-10-15 完成）
 
 **目标**：跑通最小闭环——agent 能通过 MCP 操作 niri 窗口/工作区，验证”goose + 自研 MCP server”这条集成路线。
 
@@ -27,11 +27,14 @@
 - goose 以 systemd user service 方式常驻（service 单元草稿已落 `os/systemd/`，`goose serve` = ACP over HTTP/WebSocket）；
 - **`niri-mcp` v0**：窗口/工作区查询、聚焦/移动/关闭窗口、spawn 应用。
 
-**进度（2026-10-14，Fedora 44 aarch64 @ VMware Fusion 真机）**：
-L1 ✅ / L2 ✅ / desktop 链路 ✅（详录 real-machine.md 实测记录）；L3 配置已就绪，
-待 LLM API key 后执行。基座评估数据同步采集完成（见 §M0 说明与 real-machine.md）。
+**完成记录（2026-10-14/15，Fedora 44 aarch64 @ VMware Fusion 真机）**：
+- L1 ✅ / L2 ✅ / desktop 链路 ✅ / **L3 ✅**——goose + GLM(coding plan, Anthropic 兼容端点) + niri-mcp/desktop-mcp，
+  一句对话完成”列窗口 → 开 alacritty → 移到工作区 2 → 关闭 → 桌面通知”，全程走自研扩展工具；
+- 33 个单测在 macOS 与 aarch64 Linux 双平台全绿；
+- 顺带产出：基座评估数据（F44 仓库 niri 26.04；updates 内核 6.19→7.2 rebase）、
+  vmrun/SSH 远程驱动真机验证的完整工作流、GLM 双端点接入文档。
 
-退出标准：终端对话 → agent 打开、排列、关闭应用，并能报告当前窗口与工作区状态。
+退出标准：终端对话 → agent 打开、排列、关闭应用，并能报告当前窗口与工作区状态。**已达成。**
 
 明确不做：UI、权限模型、GUI computer use。
 

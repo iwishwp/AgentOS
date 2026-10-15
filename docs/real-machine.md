@@ -305,3 +305,4 @@ goose session
   - **实测发现并已修复 3 个问题**：① `move-window-to-workspace` 参数为 `--window-id`（非 `--id`）；② MCP SDK stdio 客户端 env 白名单丢弃 `NIRI_SOCKET`（smoke 脚本显式透传 env）；③ 窗口 `app_id` 大小写由应用自报（"Alacritty"），匹配需不区分大小写；
   - **环境教训**：Fusion 必须开 3D 加速（niri 无软件渲染回退，症状为黑屏卡登录）；firewalld 拒绝表现为 "No route to host"；VM 直连 GitHub release 被重置，goose 走 Mac 中转 scp 安装；
   - **基座评估数据**：F44 仓库 niri 26.04（落后上游约一个小版本）；F44 updates 内核 6.19 → 7.2.10 rebase（Fedora 版内内核跟进策略实证）。
+- **2026-10-15 L3 ✅（M0 退出标准达成）**：goose + GLM（coding plan key 走 **Anthropic 兼容端点** `/api/anthropic`，套餐额度不覆盖 OpenAI 兼容端点）+ 两个自研扩展，一句对话完成列窗口→开→移→关→通知，全程走 `niri__*`/`desktop__*` 工具。两个根因修复：① 启动器 REPO_ROOT 少回退一层目录导致扩展进程秒崩、goose 静默丢弃；② 扩展配置缺 `name` 字段整条不生效（goose 不报错）。

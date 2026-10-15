@@ -9,5 +9,5 @@ if [[ -z "${NIRI_SOCKET:-}" ]]; then
   [[ -n "$NIRI_SOCKET" ]] && export NIRI_SOCKET
 fi
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 exec node "${REPO_ROOT}/packages/niri-mcp/dist/index.js" "$@"

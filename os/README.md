@@ -8,6 +8,7 @@ AgentOS 面向最终用户的部分，当前是 M5（发行）的种子，随里
 | `systemd/agentos-goose.service` | 草稿 | goose 常驻（`goose serve`，ACP over HTTP/WebSocket，127.0.0.1:3284），密钥走 EnvironmentFile；真机验证后转正 |
 | `configs/niri/config.kdl` | 草稿 | niri 会话默认键位模板（Omarchy 风格子集，含 `spawn-at-startup "mako"`）。部署到 `~/.config/niri/config.kdl`；键位文档见 [docs/keyboard.md](../docs/keyboard.md)，调研出处见 [docs/omarchy-keybindings-research.md](../docs/omarchy-keybindings-research.md)。待真机 `niri validate` 后转正 |
 | `configs/theming/` | 🆕 美化样板 | niri 美学（间距/动画/莫兰迪色板）+ CJK 字体回退 + GTK 主题；方案见 docs/theming.md |
+| `snapper/` | 🆕 M4 已配置 | btrfs 快照策略（agent 系统级变更前必须先快照）：配置记录、回滚流程与 VM 实测；配套 `scripts/snapshot.sh` |
 | `metapackage/` | 计划 M5 | pacman meta-package（AgentOS 全组件 + 默认配置） |
 | `archiso/` | 计划 M5 | archiso respin 配置（出 ISO） |
 

@@ -105,10 +105,15 @@ app=libreoffice，窗口验证 soffice 26.2）→ 通知"。意外收获：给�
 
 - **credential broker**（详见 [security/credentials.md](security/credentials.md)）：Secret Service（libsecret/gnome-keyring，兼容 Bitwarden/KeePassXC）为底座，1Password（CLI/Shell Plugins 模式）为增强；agent 拿能力不拿明文——**通道 B（代执行）已实现并实证**（cred-mcp：白名单代执行 + 输出打码，2026-10-17 哈希严格一致、偷看拦截、审计零明文）；通道 A（自动填充）/C（短期注入）待做；
 - **Keyring 自动解锁（✅ 2026-10-17 验收通过）**：注销重登实测——PAM 拉起单实例 daemon、secret-tool 写入探针瞬时成功、零弹窗（方案与实测详录 credentials.md §5.1）；
-- 权限分级 v1：portal/polkit 集成，确认粒度“每次/仅此一次/永不”；
+- 权限分级 v1：portal/polkit 集成，确认粒度“每次/仅此一次/永不”——**设计已定稿**（三档映射/policy.yaml
+  逐档示例/pkexec 装包确认路径，见 [permissions.md](permissions.md)），实现待做；
 - 审计日志：agent 全部工具调用结构化落盘；
-- 会话录屏与回放：gpu-screen-recorder 录 agent 会话；
-- snapper 快照钩子：系统级变更前自动快照 + 一键回滚（“撤销 agent 的操作”）。
+- 会话录屏与回放：gpu-screen-recorder 录 agent 会话——**v1 已落地并 VM 实测**（`scripts/record-session.sh`
+  录水族馆输出；gsr 调研结论：其 KMS/portal 架构只能录物理屏，不能只录嵌套会话，故水族馆走 grim|ffmpeg
+  通道，gsr 留作整屏场景；详见 [session-recording.md](session-recording.md)）；
+- snapper 快照钩子：系统级变更前自动快照 + 一键回滚（“撤销 agent 的操作”）——**脚本与 root 配置已落地
+  并 VM 实测**（`scripts/snapshot.sh` + [os/snapper/README.md](../os/snapper/README.md)：手动/钩子触发、
+  无定时、只读快照；与 dnf 的自动串联待权限分级落地后接）。
 
 退出标准：任何密码类操作零明文进入 agent 上下文与日志；演示一次误操作的回滚与回放。
 

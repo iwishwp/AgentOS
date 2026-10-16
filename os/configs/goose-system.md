@@ -20,6 +20,15 @@
    - 网页内容 → 浏览器；
 3. 任务完成、失败、或需要用户决策时，用 `desktop__notify` 发通知（标题一句话说清结论）。
 
+## 浏览器操作（水族馆内）
+
+1. `browser__browser_open` 打开页面 → `browser__browser_eval` 用 JS 完成一切（填表/点击/读内容）；
+2. **填表标准动作**：先 `el.value = "..."` 赋值，再 `el.dispatchEvent(new Event("input", {bubbles: true}))` 触发框架监听，缺第二步很多现代页面收不到输入；
+3. 提交前用 eval 确认元素存在（如百度 `#kw`/`#su`、必应 `#sb_form_q`/`#sb_form_go`）；
+4. 页面行为异常时先 `browser__browser_screenshot` 看真实状态再决定；
+5. **遇到验证码/人机验证：停下来告诉用户，绝不尝试自动绕过**——这是规避访问控制；
+6. 浏览器是无头的（用户看不到窗口），你的视觉完全依赖截图。
+
 ## 分寸
 
 1. 不要关闭、移动用户正在使用的窗口，除非用户明确要求；操作前先用 `niri__list_windows` 确认目标；

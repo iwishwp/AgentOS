@@ -290,7 +290,8 @@ goose session
 | 装错 x86_64 ISO | 重下 aarch64 镜像（文件名含 `aarch64`）；Apple Silicon 上 x86_64 只能全模拟，不可用 |
 | UTM 剪贴板不通 | VM 里 `sudo dnf install spice-vdagent` 后注销重登 |
 | GDM 会话列表没有 Niri | 确认 niri 已装：`ls /usr/share/wayland-sessions/` 应有 niri.desktop |
-| firewalld 拦 SSH 表现为 "No route to host" | 不是路由问题！`sudo firewall-cmd --add-service=ssh --permanent && sudo firewall-cmd --reload`（ARP 能通而 TCP 被拒即此症） |
+| 水族馆（嵌套 niri）悄悄退出了 | 嵌套会话可能随内部应用崩溃而终止。属预期行为：`agent_session_start` 随时重建（实测崩溃后再启动正常）；browser-mcp 启动依赖水族馆存在，报"未发现水族馆"时先建会话 |
+| firewalls 拦 SSH 表现为 "No route to host" | 不是路由问题！`sudo firewall-cmd --add-service=ssh --permanent && sudo firewall-cmd --reload`（ARP 能通而 TCP 被拒即此症） |
 | npm install 慢/失败 | 换镜像：`npm config set registry https://registry.npmmirror.com`（国内环境） |
 
 ## 实测记录

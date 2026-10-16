@@ -13,10 +13,11 @@
 
 ## 当前状态
 
-🚧 **M3 agent 会话（核心已通）**——M0/M1/M2 里程碑完成；**水族馆已上线**：agent 拥有独立的
-嵌套 niri 会话（session-mcp），在里面开应用、截屏并用视觉理解自己的 GUI，全程不影响用户
-桌面。七个 MCP/服务组件（niri/desktop/system/files/session + policy + canvas）真机在跑，
-95 个测试全绿。
+🚧 **M4 信任与安全（下一个）**——**M0–M3 已全部完成**（2026-10-16）：四个里程碑退出标准全部
+真机达成，最新一战是 agent 在水族馆里自主完成真实网页表单提交（必应搜索全链路）与 GUI 应用
+零焦点操作（计算器 a11y）。十一个包：7 个 MCP server（niri/desktop/system/files/session/
+atspi/browser，共 40+ 工具）+ policy（策略与审计）+ proc + canvas；118 个测试全绿；
+keyring 悬案告破（自动解锁已列为 M4 首个验收项）。
 
 ## 快速开始
 

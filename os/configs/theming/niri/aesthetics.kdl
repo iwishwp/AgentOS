@@ -40,7 +40,9 @@ layout {
         active-color "#9aa89bcc"
         inactive-color "#57534dcc"
     }
-    outline {
+    // outline 独立节点为更新版 niri 的能力（26.04 不识别，/- 为 KDL 注释前缀；
+    // 升级 niri 后可整块取消注释）
+    /-outline {
         width 3
         active-color "#00000090"
         inactive-color "#00000050"
@@ -103,7 +105,8 @@ vec4 close_color(vec3 coords_geo, vec3 size_geo) {
     config-notification-open-close {
         spring damping-ratio=1.0 stiffness=300 epsilon=0.001
     }
-    screenshot-open-close {
+    // screenshot-open-close 为更新版 niri 的动画名（26.04 不识别）
+    /-screenshot-open-close {
         spring damping-ratio=1.0 stiffness=300 epsilon=0.001
     }
 }

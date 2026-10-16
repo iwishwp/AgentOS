@@ -14,7 +14,8 @@
 ## 依赖包（dnf）
 
 ```bash
-sudo dnf install google-noto-sans-cjk-fonts google-noto-sans-mono-cjk-fonts
+# F44 实测包名（-vf- 可变字体变体；旧名 google-noto-sans-cjk-fonts 不存在）
+sudo dnf install google-noto-sans-cjk-vf-fonts google-noto-sans-mono-cjk-vf-fonts
 # 光标与图标主题需 COPR 或手动安装（Bibata / Tela-circle），见 docs/theming.md §依赖
 ```
 

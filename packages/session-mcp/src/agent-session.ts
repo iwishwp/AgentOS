@@ -107,6 +107,12 @@ export class AgentSessionManager {
       await this.wait(150);
       if (!fs.existsSync(socket)) break;
     }
+    // 兜底清理孤儿 socket（正常情况 niri 退出时自删），保证可重新 start
+    try {
+      fs.unlinkSync(socket);
+    } catch {
+      // 已不存在
+    }
     this.session = null;
   }
 
@@ -126,7 +132,8 @@ export class AgentSessionManager {
   async screenshot(name?: string): Promise<string> {
     const s = this.requireSession();
     fs.mkdirSync(this.screenshotsDir, { recursive: true });
-    const safeName = (name ?? "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
+    // Unicode 感知白名单：保留字母/数字/CJK 与 . _ -，其余（路径分隔符、控制字符等）替换
+    const safeName = (name ?? "").replace(/[^\p{L}\p{N}._-]/gu, "_").slice(0, 80);
     const file = path.join(
       this.screenshotsDir,
       `${new Date().toISOString().replace(/[:.]/g, "-")}${safeName ? `-${safeName}` : ""}.png`,

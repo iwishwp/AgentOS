@@ -272,6 +272,8 @@ goose session
 - 通过后：更新 `docs/milestones.md` 中 M0 的完成状态，把 niri 会话安装命令沉淀进
   M5 的安装脚本素材。
 
+- **2026-10-17 快捷键 ✅**：Omarchy 风格键位方案上线（worktree + 后台子代理产出，主会话审阅合并）——真机 `niri validate` 通过后部署，用户 Mac 键盘实测通过（⌘+Return 终端等）。方案与取舍：docs/keyboard.md；配置模板：os/configs/niri/config.kdl（62 个 bind，动作名对照官方默认配置纠正两处）。多会话协作模式（worktree + 子代理）验证有效。
+
 ## 排错表
 
 | 现象 | 原因与处理 |

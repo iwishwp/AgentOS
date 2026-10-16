@@ -274,6 +274,8 @@ goose session
 
 - **2026-10-17 快捷键 ✅**：Omarchy 风格键位方案上线（worktree + 后台子代理产出，主会话审阅合并）——真机 `niri validate` 通过后部署，用户 Mac 键盘实测通过（⌘+Return 终端等）。方案与取舍：docs/keyboard.md；配置模板：os/configs/niri/config.kdl（62 个 bind，动作名对照官方默认配置纠正两处）。多会话协作模式（worktree + 子代理）验证有效。
 
+- **2026-10-17 M4 通道 B ✅**：cred-mcp 凭据代理上线（`scripts/cred-store.sh` 注册 → Secret Service 存储 → 白名单代执行）。实证三连：① agent 经 cred_exec 取得凭据 SHA256 `7f39d103…`，与 orchestrator 独立 printf|sha256sum 计算**严格一致**（明文确达子进程且 agent 只见哈希；注意 echo 会带换行导致比对失败，须用 printf）；② `bash -c echo` 偷看被 exec_allow 白名单原样拒绝；③ 审计日志只含引用与决策、零明文。
+
 ## 排错表
 
 | 现象 | 原因与处理 |

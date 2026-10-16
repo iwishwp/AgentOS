@@ -39,7 +39,14 @@ Secret Service / gnome-keyring / Bitwarden / KeePassXC / 1Password
 1Password/Bitwarden 桌面端自带的 autofill 直接填充到目标窗口；agent 只发起
 “请在窗口 X 填充 vault://…/login”请求并等待完成信号。填充过程对 agent 不可见。
 
-### 通道 B：代为执行（CLI/命令类）
+### 通道 B：代为执行（CLI/命令类）——✅ 已实现（cred-mcp，2026-10-17）
+
+实现：`packages/cred-mcp`（工具 `cred_list`/`cred_exec`）。安全模型四条：① 命令为数组直
+spawn（无 shell 注入面），argv[0] 必须命中该凭据 `exec_allow` 白名单；② 明文只注入子进程
+环境变量；③ 返回输出中所有明文出现处打码；④ 审计只记引用+命令+决策。策略文件
+`~/.config/agentos/credentials.yaml`，注册工具 `scripts/cred-store.sh`。实测（2026-10-17）：
+agent 经代理取到凭据 SHA256（与 orchestrator 独立计算严格一致），`bash -c echo` 偷看被
+白名单拦截。
 
 借鉴 1Password Shell Plugins 的模式：需要凭据的命令（`git push`、`op run --`、
 curl 带 token 等）由 broker 代为起进程，secret 经 stdin 或 broker 注入的 env 进入

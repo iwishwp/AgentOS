@@ -41,6 +41,8 @@ npm install && npm run build && npm test
 - [架构设计](docs/architecture.md)
 - [里程碑开发计划](docs/milestones.md)
 - [凭据代理与密码管理集成](docs/security/credentials.md)
+- [权限分级 v1（三档/portal/polkit）](docs/permissions.md)
+- [会话录屏与回放](docs/session-recording.md)
 - [goose 接入说明](docs/goose-integration.md)
 - [真机安装与 M0 验证手册](docs/real-machine.md)
 

@@ -32,6 +32,18 @@ interface TargetInfo {
 
 const NIRI_SOCKET_RE = /^niri\.(wayland-\d+)\.(\d+)\.sock$/;
 
+/** 各发行版 chromium 可执行名不一致（Fedora: chromium-browser），逐个探测 */
+function detectChromiumBin(): string {
+  const candidates = ["chromium", "chromium-browser", "chromium-bin", "google-chrome"];
+  for (const name of candidates) {
+    for (const dir of ["/usr/bin", "/usr/local/bin"]) {
+      const p = path.join(dir, name);
+      if (fs.existsSync(p)) return p;
+    }
+  }
+  return "chromium";
+}
+
 /**
  * 水族馆里的浏览器：Chromium + 原生 CDP（WebSocket）。
  * Firefox 已移除 CDP，故选 Chromium；零第三方依赖（Node 22 全局 WebSocket）。
@@ -50,7 +62,8 @@ export class BrowserClient {
 
   constructor(deps: BrowserDeps = {}) {
     this.port = deps.port ?? 9222;
-    this.chromiumBin = deps.chromiumBin ?? process.env["CHROMIUM_BIN"] ?? "chromium";
+    this.chromiumBin =
+      deps.chromiumBin ?? process.env["CHROMIUM_BIN"] ?? detectChromiumBin();
     this.userDataDir =
       deps.userDataDir ?? path.join(os.homedir(), ".local", "share", "agentos", "chromium");
     this.screenshotsDir =

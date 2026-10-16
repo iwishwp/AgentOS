@@ -1,0 +1,55 @@
+/* AgentOS waybar 样式——配合 niri 美学的莫兰迪色板（os/configs/theming） */
+
+* {
+  font-family: "Noto Sans", "Noto Sans CJK SC", sans-serif;
+  font-size: 13px;
+  min-height: 0;
+}
+
+window#waybar {
+  background: rgba(17, 19, 24, 0.85);
+  border-radius: 10px;
+  border: 1px solid rgba(154, 168, 155, 0.25);
+}
+
+#workspaces {
+  margin: 0 6px;
+}
+
+#workspaces button {
+  color: #9aa0aa;
+  background: transparent;
+  border-radius: 6px;
+  padding: 0 9px;
+  margin: 4px 2px;
+}
+
+#workspaces button.focused {
+  color: #111318;
+  background: #9aa89b; /* 莫兰迪灰绿——与 niri 焦点环同色 */
+}
+
+#window {
+  color: #e6e6e6;
+  margin: 0 10px;
+  font-weight: 500;
+}
+
+#clock,
+#cpu,
+#memory,
+#network,
+#pulseaudio,
+#tray {
+  color: #c8ccd4;
+  margin: 0 8px;
+}
+
+#clock {
+  color: #9aa89b;
+  font-weight: 600;
+}
+
+#tray {
+  margin-right: 2px;
+}

@@ -1,0 +1,45 @@
+{
+  "layer": "top",
+  "position": "top",
+  "height": 34,
+  "margin-top": 6,
+  "margin-left": 10,
+  "margin-right": 10,
+  "modules-left": ["niri/workspaces", "niri/window"],
+  "modules-right": ["tray", "pulseaudio", "network", "memory", "cpu", "clock"],
+  "niri/workspaces": {
+    "format": "{index}"
+  },
+  "niri/window": {
+    "format": "{}",
+    "max-length": 40
+  },
+  "clock": {
+    "format": "{:%H:%M}",
+    "format-alt": "{:%m月%d日 %a %H:%M}",
+    "tooltip-format": "{:%Y-%m-%d %H:%M:%S}"
+  },
+  "cpu": {
+    "format": "CPU {usage}%",
+    "interval": 5
+  },
+  "memory": {
+    "format": "内存 {percentage}%",
+    "interval": 5
+  },
+  "network": {
+    "format-wifi": "WiFi {essid}",
+    "format-ethernet": "有线",
+    "format-disconnected": "无网络",
+    "tooltip-format": "{ifname}: {ipaddr}"
+  },
+  "pulseaudio": {
+    "format": "音量 {volume}%",
+    "format-muted": "静音",
+    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+  },
+  "tray": {
+    "icon-size": 16,
+    "spacing": 8
+  }
+}

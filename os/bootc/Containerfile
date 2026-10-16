@@ -1,0 +1,163 @@
+# syntax=docker/dockerfile:1
+# =============================================================================
+# AgentOS bootc 镜像（M5 Atomic PoC，ADR-0001）
+#
+# 形态：Fedora Atomic（bootc/OCI）。整个用户空间——内核以外的桌面、应用、
+# AgentOS 组件、默认配置——全部烘焙进一个 OCI 镜像；host 不可变，更新 =
+# 拉新镜像 + 原子切换启动条目，失败自动回滚（bootc 语义，见 docs/m5-atomic.md）。
+#
+# 基础镜像：quay.io/fedora/fedora-bootc —— Fedora 官方 bootc 基座
+#   （https://docs.bootc.io · 参考发行版：Bazzite/uBlue，同为 bootc 桌面形态）
+#   tag 用数字版本（44）而非 latest：与 ADR-0001「滚动跟进最新两个稳定版」对齐，
+#   且可复现；latest 会被上游悄然 rebase，不适合作为 OS 基座。
+#
+# 分层原则（自下而上：越往下越稳定、越往上变动越频繁，最大化层缓存命中）：
+#   1. 桌面运行时（dnf 系统包，对照 os/install.sh 的 dnf 清单）
+#   2. gpu-screen-recorder（COPR，M4 会话录屏，独立层便于追踪上游）
+#   3. AgentOS 组件（多阶段构建的 npm workspaces 产物）
+#   4. goose CLI（GitHub release 二进制；构建时装或首启动装，见 ARG 说明）
+#   5. 默认配置 + systemd 单元（最常迭代的内容放最上层）
+#
+# 构建方法见 scripts/build-image.sh；设计与取舍见 docs/m5-atomic.md。
+# =============================================================================
+
+# Fedora 大版本号（ADR-0001：跟随最新两个稳定版；CI 升级时只改这里）
+ARG FEDORA_VERSION=44
+
+# goose 安装模式：
+#   firstboot（默认）—— 不在构建时装。goose 是 GitHub release 二进制，
+#     本地构建网络（如本项目的 aarch64 VM）到 github.com 常被重置，实测
+#     download_cli.sh 直连 55s 超时；改由首启动 systemd 单元安装
+#     （os/bootc/firstboot/install-goose.sh），开机联网后自愈。
+#   build —— 在构建时装进 /usr/local/bin（要求构建环境可达 github.com，
+#     适合 CI；本仓库网络环境下未实测，见 docs/m5-atomic.md「遗留清单」）。
+ARG GOOSE_INSTALL_MODE=firstboot
+
+# -----------------------------------------------------------------------------
+# 阶段 1/2：builder —— 编译 AgentOS npm workspaces
+# 用与最终镜像相同的基础镜像（复用已拉取的层，少一次网络往返），
+# 只装构建所需的最小工具链。bootc 官方文档推荐多阶段构建：
+# 基础镜像没有 systemd 运行期状态，编译产物 COPY 进最终层最干净。
+# -----------------------------------------------------------------------------
+FROM quay.io/fedora/fedora-bootc:${FEDORA_VERSION} AS builder
+
+# F44 的 Node 走版本化包名（nodejs22 / nodejs22-npm），无裸 nodejs 包；
+# nodejs22 = 与全部真机验证（M0–M4）一致的运行时版本
+RUN dnf -y install nodejs22 nodejs22-npm git && dnf clean all
+
+WORKDIR /build
+# 只拷构建必需物：workspaces 清单 + packages/（.containerignore 已剔除
+# .git/node_modules/dist/docs 等，context 干净且可复现）
+COPY package.json package-lock.json ./
+COPY packages/ packages/
+
+# 先装依赖再构建；构建完成后把 node_modules 重置为「仅生产依赖」——
+# typescript/vitest 等开发依赖不进最终镜像（MCP 运行时只需要
+# @modelcontextprotocol/sdk / zod / yaml，实测见各 package.json）
+RUN npm ci --no-audit --no-fund \
+    && npm run build \
+    && rm -rf node_modules \
+    && npm ci --no-audit --no-fund --omit=dev
+
+# -----------------------------------------------------------------------------
+# 阶段 2/2：最终镜像 —— 可启动的 AgentOS 磁盘镜像（OCI transport）
+# -----------------------------------------------------------------------------
+FROM quay.io/fedora/fedora-bootc:${FEDORA_VERSION}
+
+# ==== 层 1：桌面运行时（对照 os/install.sh 的 dnf 清单 + 桌面基础设施）====
+# fedora-bootc 基座是最小系统（systemd/dnf/网络栈），桌面需要补齐：
+RUN dnf -y install \
+        # --- 会话核心（install.sh 清单）---
+        niri \
+        xdg-desktop-portal-gnome \
+        xdg-desktop-portal-gtk \
+        # --- 终端 / 启动器 / 剪贴板 / 通知 / 锁屏 / 截图（install.sh 清单）---
+        alacritty fuzzel wl-clipboard libnotify mako swaylock grim \
+        # --- 预装应用（agent 与人类用户的日用面）---
+        gnome-calculator libreoffice-writer \
+        # --- 开发与组件运行时（canvas 等 systemd 单元需要 node）---
+        nodejs22 nodejs22-npm git \
+        # --- 显示管理器：SDDM + 通用 Wayland greeter ---
+        # Bazzite 同构选择；GDM 虽是 VM 现役实证组合，但依赖 gnome-shell
+        # 整个被拖进镜像；SDDM 轻得多且 niri 的 /usr/share/wayland-sessions/
+        # niri.desktop 由 niri 包自带，SDDM 会话列表直接可选（F44 实测包名）
+        sddm sddm-wayland-generic accountsservice \
+        # --- 桌面基础设施（基座缺项）：音频栈 / GL / 标准用户目录 ---
+        pipewire-audio mesa-dri-drivers xdg-user-dirs \
+        # --- CJK 字体（os/configs/theming 的 F44 实测包名，-vf- 变体）---
+        google-noto-sans-cjk-vf-fonts google-noto-sans-mono-cjk-vf-fonts \
+        default-fonts-core-sans \
+        # --- 基础工具（goose 首启动安装脚本等需要 curl）---
+        curl \
+    && dnf clean all
+
+# ==== 层 2：gpu-screen-recorder（M4 会话录屏，另一代理负责 VM 侧安装）====
+# 不在 F44 官方仓库（实测 repoquery 为空），来自 COPR arabianq/gpu-screen-recorder
+# （上游 auto_rebuild，F44 aarch64/x86_64 双架构有成功构建，API 实测确认）。
+# 独立成层：上游重构建频繁，单列可避免连带作废桌面层缓存。
+# dnf5 的 copr 插件按 F44 实测装 dnf5-plugins。
+RUN dnf -y install dnf5-plugins \
+    && dnf -y copr enable arabianq/gpu-screen-recorder \
+    && dnf -y install gpu-screen-recorder \
+    && dnf clean all
+
+# ==== 层 3：AgentOS 组件（builder 产物：packages + dist + 生产 node_modules）====
+COPY --from=builder /build/ /usr/share/agentos/
+# 把 workspace 可执行入口（niri-mcp/desktop-mcp/.../agentos-canvas）挂到 PATH，
+# goose 的 MCP 配置可直接引用命令名
+RUN for b in /usr/share/agentos/node_modules/.bin/*; do \
+        ln -s "$b" "/usr/local/bin/$(basename "$b")"; \
+    done \
+    # 构建期只做语法级冒烟：canvas 的 index.js 会直接 listen() 挂住构建，
+    # 不能真启动（node --check 只解析不执行）
+    && node --check /usr/share/agentos/packages/canvas/dist/index.js \
+    && node --check /usr/share/agentos/packages/niri-mcp/dist/index.js
+
+# ==== 层 4：goose CLI（桌面 agent 宿主）====
+# 默认 firstboot：镜像里只放安装脚本 + 首启动单元（层 5 启用），
+# 开机联网后装到 ~/.local/bin（对每个登录用户独立、无需 root）。
+# ARG 为 build 时：直接下载二进制进 /usr/local/bin，所有用户共享。
+RUN if [ "$GOOSE_INSTALL_MODE" = "build" ]; then \
+        curl -fsSL --retry 3 --max-time 120 \
+            https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh \
+            -o /tmp/goose-install.sh \
+        && bash /tmp/goose-install.sh \
+        && install -m 0755 /root/.local/bin/goose /usr/local/bin/goose \
+        && rm -f /tmp/goose-install.sh; \
+    fi
+
+# ==== 层 5：默认配置 + systemd 单元 + 收尾 lint ====
+# 配置部署策略（与 /etc/skel 方案的取舍，详见 docs/m5-atomic.md §配置分发）：
+#   不可变默认放 /usr/share/agentos/defaults/（随镜像版本走），
+#   首启动 user 单元 only-if-absent 复制进 ~/.config（不覆盖用户改动，
+#   镜像更新带来的新默认文件可继续到达用户）——Bazzite 的
+#   bazzite-user-setup.service 同构。/etc/skel 只覆盖「新建用户」，
+#   bootc 下用户创建时机不定（installer/Ignition/手工），故不采用。
+COPY os/configs/niri/config.kdl            /usr/share/agentos/defaults/niri/config.kdl
+COPY os/configs/theming/niri/aesthetics.kdl /usr/share/agentos/defaults/niri/aesthetics.kdl
+COPY os/configs/theming/fontconfig/        /usr/share/agentos/defaults/fontconfig/conf.d/
+COPY os/configs/theming/gtk-3.0/           /usr/share/agentos/defaults/gtk-3.0/
+COPY os/configs/theming/gtk-4.0/           /usr/share/agentos/defaults/gtk-4.0/
+
+# 首启动脚本：goose 安装（网络受限时的兜底）+ 配置 only-if-absent 部署
+COPY os/bootc/firstboot/ /usr/share/agentos/bin/
+RUN chmod 0755 /usr/share/agentos/bin/*.sh
+
+# user 单元（对每个登录用户生效）：
+#   agentos-user-setup.service  —— 首次进入图形会话时部署默认配置（幂等）
+#   agentos-canvas.service      —— canvas 生成式 UI 服务（127.0.0.1:7788）
+#   agentos-goose-firstboot.service —— goose 缺失时装（GOOSE_INSTALL_MODE=firstboot 时才有意义）
+COPY os/bootc/systemd/ /usr/lib/systemd/user/
+# 系统单元：SDDM 显示管理器开机自启（bootc 下 systemctl enable 合法，
+# start 不行——构建期无 systemd 运行，bootc 官方文档明确）
+RUN systemctl enable sddm \
+    && systemctl --global enable agentos-user-setup.service agentos-canvas.service agentos-goose-firstboot.service
+
+# 构建期就用镜像里的 niri 校验默认配置（include 相对路径按配置文件位置解析，
+# 所以放在 COPY 之后跑）——配置语法错误在构建期暴露，不留到用户登录
+RUN niri validate -c /usr/share/agentos/defaults/niri/config.kdl
+
+# bootc 官方推荐的最终步骤：镜像健康度静态检查
+# （--network=none：此时已不需要网络，避免额外网络依赖）
+RUN rm -f /etc/machine-id \
+    && bootc container lint

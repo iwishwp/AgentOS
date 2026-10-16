@@ -1,0 +1,21 @@
+# podman/docker 构建上下文裁剪（与 os/bootc/Containerfile 配套，
+# 文件名 = <Containerfile>.containerignore，podman 自动识别）
+# 目的：context 最小化 → 上传快、构建可复现、.git/本机产物不进镜像。
+# 注意：os/configs、os/bootc/{firstboot,systemd} 必须留在 context ——
+# 最终阶段要 COPY 它们；只排除构建机本地杂物。
+.git
+.gitignore
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+docs/
+scripts/
+os/bootc/Containerfile
+os/bootc/Containerfile.containerignore
+os/README.md
+os/install.sh
+.DS_Store
+*.log
+.env
+.env.*

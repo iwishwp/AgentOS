@@ -1,0 +1,17 @@
+# AgentOS canvas 服务（镜像版：产物在 /usr/share/agentos，不依赖 ~/AgentOS 检出）
+# 与 os/systemd/agentos-canvas.service 的区别：ExecStart 指向镜像内路径。
+# 数据目录仍在用户家（AGENTOS_CANVAS_ROOT=%h/Agent/canvas，含沙箱纪律）。
+[Unit]
+Description=AgentOS canvas server (local generative UI host, 127.0.0.1 only)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/node /usr/share/agentos/packages/canvas/dist/index.js
+Environment=AGENTOS_CANVAS_ROOT=%h/Agent/canvas
+Environment=AGENTOS_CANVAS_PORT=7788
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical-session.target

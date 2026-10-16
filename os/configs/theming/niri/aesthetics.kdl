@@ -1,0 +1,109 @@
+// AgentOS 美学配置（niri）——layout 与 animations 段
+//
+// 思路参考 github.com/LanRhyme/dotfiles（无许可证仓库，未拷贝其内容；
+// 参数与配色为 AgentOS 自写），动画曲线参数对照 niri 官方 wiki
+// Animation 文档；窗口关闭着色器为 niri wiki「Custom Shaders」文档的
+// fall_and_rotate 官方示例变体。
+//
+// 使用：主配置 config.kdl 顶部 include 本文件。niri 的 include 语义为
+// 文档拼接，因此主配置中不要再出现 layout / animations 节点（会重复定义）。
+
+layout {
+    // 窗口间距：8px 是平铺密度与呼吸感的平衡点
+    gaps 8
+
+    // 居中策略：不自动居中聚焦列，但单列窗口始终居中（宽屏阅读体验好）
+    center-focused-column "never"
+    always-center-single-column
+
+    // 透明背景：给桌面 shell（Noctalia）留出壁纸绘制层。
+    // 未装 shell 时 niri 自用 fallback 颜色，见下方 background-color 说明。
+    background-color "transparent"
+
+    // 新窗口默认宽度：半屏起步（预设 1/3 与 2/3 供 Mod+-/Mod+= 调整）
+    default-column-width { proportion 0.5; }
+    preset-column-widths {
+        proportion 0.33333
+        proportion 0.5
+        proportion 0.66667
+    }
+
+    // 边框关闭，用 focus-ring + outline 表达焦点（更轻盈的视觉层级）
+    border {
+        off
+    }
+
+    // ─── 莫兰迪静态色板（AgentOS 自配）───
+    // 灰绿做活动焦点（沉静的强调）、暖炭做非活动、陶土做紧急
+    focus-ring {
+        width 3
+        active-color "#9aa89bcc"
+        inactive-color "#57534dcc"
+    }
+    outline {
+        width 3
+        active-color "#00000090"
+        inactive-color "#00000050"
+        urgent-color "#c08e7e"
+    }
+
+    struts {
+        top 0
+        bottom 0
+        left 0
+        right 0
+    }
+}
+
+animations {
+    // 工作区切换 / 水平滚动：临界阻尼弹簧，无回弹的顺滑滑动
+    workspace-switch {
+        spring damping-ratio=1.0 stiffness=140 epsilon=0.0001
+    }
+    horizontal-view-movement {
+        spring damping-ratio=1.0 stiffness=140 epsilon=0.0001
+    }
+    // 窗口打开：缓入
+    window-open {
+        spring damping-ratio=1.0 stiffness=150 epsilon=0.0001
+    }
+    // 窗口关闭：掉落 + 轻微旋转（niri wiki 官方示例变体）
+    window-close {
+        duration-ms 350
+        curve "ease-out-quad"
+        custom-shader r#"
+vec4 fall_and_rotate(vec3 coords_geo, vec3 size_geo) {
+    float progress = niri_clamped_progress * niri_clamped_progress;
+    vec2 coords = (coords_geo.xy - vec2(0.5, 1.0)) * size_geo.xy;
+    coords.y -= progress * 200.0;
+    float random = (niri_random_seed - 0.5) / 2.0;
+    random = sign(random) - random;
+    float max_angle = 0.05 * random;
+    float angle = progress * max_angle;
+    mat2 rotate = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
+    coords = rotate * coords;
+    coords_geo = vec3(coords / size_geo.xy + vec2(0.5, 1.0), 1.0);
+    vec3 coords_tex = niri_geo_to_tex * coords_geo;
+    vec4 color = texture2D(niri_tex, coords_tex.st);
+    return color * (1.0 - niri_clamped_progress);
+}
+vec4 close_color(vec3 coords_geo, vec3 size_geo) {
+    return fall_and_rotate(coords_geo, size_geo);
+}
+"#
+    }
+    // 窗口移动/尺寸变化：平稳归位，没有果冻感
+    window-movement {
+        spring damping-ratio=1.0 stiffness=140 epsilon=0.0001
+    }
+    window-resize {
+        spring damping-ratio=1.0 stiffness=140 epsilon=0.0001
+    }
+    // 配置重载与截图指示：快而钝
+    config-notification-open-close {
+        spring damping-ratio=1.0 stiffness=300 epsilon=0.001
+    }
+    screenshot-open-close {
+        spring damping-ratio=1.0 stiffness=300 epsilon=0.001
+    }
+}

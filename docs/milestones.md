@@ -104,7 +104,7 @@ app=libreoffice，窗口验证 soffice 26.2）→ 通知"。意外收获：给�
 范围：
 
 - **credential broker**（详见 [security/credentials.md](security/credentials.md)）：Secret Service（libsecret/gnome-keyring，兼容 Bitwarden/KeePassXC）为底座，1Password（CLI/Shell Plugins 模式）为增强；agent 拿能力不拿明文；
-- **Keyring 自动解锁（M4 前置验收项）**：登录后 `org.freedesktop.secrets` 无弹窗直接可用、daemon 单实例（PAM 已就位，实测存在 dbus 激活实例与 PAM 解锁状态分裂，方案见 credentials.md §5.1）；
+- **Keyring 自动解锁（✅ 2026-10-17 验收通过）**：注销重登实测——PAM 拉起单实例 daemon、secret-tool 写入探针瞬时成功、零弹窗（方案与实测详录 credentials.md §5.1）；
 - 权限分级 v1：portal/polkit 集成，确认粒度“每次/仅此一次/永不”；
 - 审计日志：agent 全部工具调用结构化落盘；
 - 会话录屏与回放：gpu-screen-recorder 录 agent 会话；

@@ -98,11 +98,11 @@ Cookie，钥匙环未解锁 → 弹 "Unlock login Keyring" 对话框 → **网�
 
 自动解锁的分层方案：
 
-1. **PAM 层（已就位，待验证）**：Fedora 的 gdm-password PAM 栈已含
-   `pam_gnome_keyring auto_start`，正常 GDM 登录应自动解锁登录钥匙环。实测弹窗说明
-   存在状态分裂——dbus 激活的 gnome-keyring-daemon 实例未继承 PAM 解锁状态
-   （多会话/嵌套环境典型问题；VM 上 gnome-keyring-daemon.socket 为 inactive）。
-   **M4 验收项：登录后 `org.freedesktop.secrets` 无弹窗直接可用；守护进程全用户单实例。**
+1. **PAM 层（✅ 2026-10-17 验证通过）**：Fedora 的 gdm-password PAM 栈含
+   `pam_gnome_keyring auto_start`。实测（注销→GDM 重新登录 Niri 会话）：**单实例**
+   `gnome-keyring-daemon --login`（PAM 拉起），secret-tool 写入探针**瞬时成功、零弹窗**——
+   正常登录路径全程无感解锁。此前弹窗发生于多次崩溃的嵌套会话环境（无法完全复现），
+   Broker 层保留统一上下文设计作为防线。
 2. **Broker 层（根治）**：agent 相关进程一律经 credential broker 访问 Secret Service，
    broker 运行在已解锁的图形会话上下文里，保证连到"正确的那只" daemon——多实例分裂
    从架构上消除。

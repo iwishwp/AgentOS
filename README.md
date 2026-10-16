@@ -13,9 +13,10 @@
 
 ## 当前状态
 
-🚧 **M2 呈现层（下一个）**——M0/M1 已完成（2026-10-15）：四个 MCP server（niri 8 工具 / desktop
-5 工具 / system 7 工具 / files 8 工具）全部真机验证，权限模型 v0（策略 + 审计日志）上线，
-退出标准"纯对话完成下载→整理→生成文档→LibreOffice 展示"达成。76 个测试双平台全绿。
+🚧 **M3 agent 会话（核心已通）**——M0/M1/M2 里程碑完成；**水族馆已上线**：agent 拥有独立的
+嵌套 niri 会话（session-mcp），在里面开应用、截屏并用视觉理解自己的 GUI，全程不影响用户
+桌面。七个 MCP/服务组件（niri/desktop/system/files/session + policy + canvas）真机在跑，
+95 个测试全绿。
 
 ## 快速开始
 

@@ -86,7 +86,7 @@ app=libreoffice，窗口验证 soffice 26.2）→ 通知"。意外收获：给�
   感知-操作闭环成立，全程不动用户焦点）；
 - **`atspi-mcp`**：AT-SPI2 无障碍桥（列应用/倒树/**按名称点击/读写文本**——无需焦点）；✅ **已落地并真机验证**（2026-10-16：水族馆内 gnome-calculator 被 agent 全自主操作，6×7=42 显示屏读数确认；期间 agent 还自己发现并修复了桥的角色名白名单 bug）；
 - 输入注入：ydotool 受控封装——**优先级降低**：a11y 通道已覆盖主要 GUI 操作，ydotool 仅作非无障碍应用兜底；⬜ 待做
-- 浏览器自动化接入（agent 会话内浏览器）；⬜ 待做（浏览器自带 DevTools 协议，优先走 CDP）
+- 浏览器自动化接入（agent 会话内浏览器）；⏸ **browser-mcp 已开发完成并经 data:URL 全链路验证**（Chromium+原生 CDP，118 测试），但本 VM 环境 Chromium 网络服务失能（含 loopback）、Firefox Marionette 端口静默——真实网站表单提交留待真机/换环境验证（详录 real-machine.md）
 - “水族馆”窗口规则（自动摆位/尺寸）；⬜ 打磨项
 
 关键技术记录（详见 real-machine.md 实测）：GTK4 需 AT 客户端注册后才暴露完整无障碍树（16→105 节点）；libadwaita 嵌套深（按钮在 8 层以下）；**树结构跨 AT 连接会重建，索引路径不可跨进程使用——操作必须按名称寻址**；GTK3/4 角色名不一致（push button vs button）。

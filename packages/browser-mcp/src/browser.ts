@@ -144,8 +144,17 @@ export class BrowserClient {
 
   async open(url: string): Promise<string> {
     const c = await this.connection();
-    await c.send("Page.navigate", { url });
-    await this.wait(1500); // 等待初步加载；复杂页面由调用方自行 sleep/eval 确认
+    try {
+      await c.send("Page.navigate", { url });
+    } catch {
+      // 跨站导航会交换渲染进程、销毁当前 target，navigate 响应可能永不到达——
+      // 忽略，靠下面的重新发现目标恢复连接
+    }
+    await this.wait(1500); // 等初步加载
+    // target 可能已更换（OOPIF/站点隔离），强制重连
+    this.conn?.close();
+    this.conn = null;
+    await this.ensure();
     const info = (await this.eval("location.href")) as { value?: unknown };
     return `已导航: ${String(info?.value ?? url)}`;
   }

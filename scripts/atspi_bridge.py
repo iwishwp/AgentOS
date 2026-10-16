@@ -148,7 +148,8 @@ def dfs(acc, depth=0, max_depth=24):
 def cmd_click(app, target):
     for node in dfs(app):
         try:
-            if node.getRoleName() not in ("push button", "toggle button"):
+            # GTK3/GTK4 角色名不一致：GTK4 计算器上报 "button"（goose 实测发现并回修）
+            if node.getRoleName() not in ("button", "push button", "toggle button"):
                 continue
             if node.name == target:
                 act = node.queryAction()

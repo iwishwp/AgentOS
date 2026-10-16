@@ -32,6 +32,25 @@ export class AtspiBridge {
     return this.call(["tree", app, String(depth)]);
   }
 
+  /** 按名称点击按钮（推荐：树结构跨进程不稳定，名称寻址稳定） */
+  async click(app: string, buttonName: string): Promise<unknown> {
+    assertAppName(app);
+    if (!buttonName.trim()) throw new AtspiError("按钮名不能为空");
+    return this.call(["click", app, buttonName]);
+  }
+
+  /** 读取应用内全部非空文本节点（读显示屏/结果的主力） */
+  async texts(app: string): Promise<unknown> {
+    assertAppName(app);
+    return this.call(["texts", app]);
+  }
+
+  /** 对匹配的可编辑文本节点设置内容（match 为 * 时取第一个） */
+  async setTextByMatch(app: string, match: string, text: string): Promise<unknown> {
+    assertAppName(app);
+    return this.call(["settext", app, match, text]);
+  }
+
   async doAction(app: string, path: number[], actionIndex: number): Promise<unknown> {
     assertAppName(app);
     if (path.length === 0 || path.some((n) => !Number.isInteger(n) || n < 0)) {

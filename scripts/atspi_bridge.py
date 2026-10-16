@@ -126,6 +126,67 @@ def navigate(app, path_str):
     return acc
 
 
+def dfs(acc, depth=0, max_depth=24):
+    """深度优先产出节点。树结构跨 AT 连接可能重建，路径寻址不稳定——
+    实际操作一律按 名称/角色 查找（click/texts/settext），路径仅用于单次 dump 内分析。"""
+    yield acc
+    if depth >= max_depth:
+        return
+    try:
+        count = acc.childCount
+    except Exception:
+        return
+    for i in range(count):
+        try:
+            child = acc.getChildAtIndex(i)
+        except Exception:
+            continue
+        if child is not None:
+            yield from dfs(child, depth + 1, max_depth)
+
+
+def cmd_click(app, target):
+    for node in dfs(app):
+        try:
+            if node.getRoleName() not in ("push button", "toggle button"):
+                continue
+            if node.name == target:
+                act = node.queryAction()
+                ok = act.doAction(0)
+                return {"done": bool(ok), "clicked": target}
+        except Exception:
+            continue
+    raise RuntimeError(f"未找到名为 {target!r} 的按钮")
+
+
+def cmd_texts(app):
+    out = []
+    for node in dfs(app):
+        try:
+            if node.getRoleName() in ("text", "edit"):
+                content = text_of(node)
+                if content is not None and content.strip() != "":
+                    out.append({"name": node.name, "text": content})
+        except Exception:
+            continue
+    return {"texts": out}
+
+
+def cmd_settext(app, match, new_text):
+    for node in dfs(app):
+        try:
+            if node.getRoleName() not in ("text", "edit"):
+                continue
+            if match != "*" and match not in (node.name or ""):
+                continue
+            editable = node.queryEditableText()
+            ok = editable.setTextContents(new_text)
+            return {"done": bool(ok), "name": node.name}
+        except Exception:
+            continue
+    raise RuntimeError(f"未找到可编辑文本节点（匹配 {match!r}）")
+
+
 def main():
     # 以 AT（辅助技术）身份向注册表登记：GTK4 等工具包收到 ATRegister 后才构建完整
     # 无障碍树，匿名一次性访问只能看到空骨架（实测 gnome-calculator 16→105 节点）
@@ -151,7 +212,7 @@ def main():
         print(json.dumps({"apps": apps}, ensure_ascii=False))
         return 0
 
-    if cmd not in ("tree", "action", "text") or len(sys.argv) < 4:
+    if cmd not in ("tree", "action", "text", "click", "texts", "settext") or len(sys.argv) < 3:
         print("参数不足", file=sys.stderr)
         return 2
     app = find_app(sys.argv[2])
@@ -164,6 +225,28 @@ def main():
                 names.append(a.name)
         print(f"未找到应用 {sys.argv[2]}；当前注册: {names}", file=sys.stderr)
         return 1
+
+    # 名称寻址命令（推荐：跨进程稳定）
+    if cmd == "click":
+        if len(sys.argv) < 4:
+            print("缺少按钮名", file=sys.stderr)
+            return 2
+        print(json.dumps(cmd_click(app, sys.argv[3]), ensure_ascii=False))
+        return 0
+    if cmd == "texts":
+        print(json.dumps(cmd_texts(app), ensure_ascii=False))
+        return 0
+    if cmd == "settext":
+        if len(sys.argv) < 5:
+            print("缺少参数", file=sys.stderr)
+            return 2
+        print(json.dumps(cmd_settext(app, sys.argv[3], sys.argv[4]), ensure_ascii=False))
+        return 0
+
+    # 路径寻址命令（仅当与 dump 在同一进程内使用才可靠，保留作调试）
+    if len(sys.argv) < 4:
+        print("参数不足", file=sys.stderr)
+        return 2
 
     if cmd == "tree":
         depth = int(sys.argv[3]) if len(sys.argv) > 3 else 6

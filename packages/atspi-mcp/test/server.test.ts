@@ -9,15 +9,18 @@ import { Policy } from "@agentos/policy";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildServer } from "../src/server.js";
 
+process.env.AGENTOS_AUDIT_PATH = "/tmp/agentos-test-audit.jsonl";
+
 let runner: FakeRunner;
 let client: Client;
+let script: string;
 
 beforeEach(async () => {
   runner = new FakeRunner();
   const dir = mkdtempSync(path.join(os.tmpdir(), "agentos-atspi-mcp-"));
-  // 让 bridge 构造时能找到"脚本"
-  process.env["ATSPI_BRIDGE"] = path.join(dir, "atspi_bridge.py");
-  fs.writeFileSync(process.env["ATSPI_BRIDGE"], "# fake");
+  script = path.join(dir, "atspi_bridge.py");
+  fs.writeFileSync(script, "# fake");
+  process.env["ATSPI_BRIDGE"] = script;
   const [ct, st] = InMemoryTransport.createLinkedPair();
   await buildServer(runner).connect(st);
   client = new Client({ name: "t", version: "0" });
@@ -29,31 +32,41 @@ function textOf(r: { content: unknown }): string {
 }
 
 describe("MCP 工具面", () => {
-  it("注册 4 个工具", async () => {
+  it("注册 5 个工具", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
-      "a11y_do_action",
+      "a11y_click",
       "a11y_dump_tree",
       "a11y_list_apps",
+      "a11y_read_texts",
       "a11y_set_text",
     ]);
   });
 
   it("list_apps 返回桥的 JSON", async () => {
-    runner.on([process.env["ATSPI_BRIDGE"]!, "apps"], { stdout: '{"apps":[{"name":"x"}]}' });
+    runner.on([script, "apps"], { stdout: '{"apps":[{"name":"x"}]}' });
     const r = await client.callTool({ name: "a11y_list_apps", arguments: {} });
     expect(textOf(r)).toContain('"name"');
   });
 
-  it("do_action 透传路径参数", async () => {
-    const script = process.env["ATSPI_BRIDGE"]!;
-    runner.on([script, "action"], { stdout: '{"done":true}' });
+  it("click 按名称寻址", async () => {
+    runner.on([script, "click"], { stdout: '{"done":true,"clicked":"7"}' });
     const r = await client.callTool({
-      name: "a11y_do_action",
-      arguments: { app: "calc", path: [0, 1, 2], actionIndex: 0 },
+      name: "a11y_click",
+      arguments: { app: "gnome-calculator", buttonName: "7" },
+    });
+    expect(textOf(r)).toContain("clicked");
+    expect(runner.lastArgs()).toEqual([script, "click", "gnome-calculator", "7"]);
+  });
+
+  it("set_text 传 match 与新文本", async () => {
+    runner.on([script, "settext"], { stdout: '{"done":true}' });
+    const r = await client.callTool({
+      name: "a11y_set_text",
+      arguments: { app: "app", match: "搜索", text: "AgentOS" },
     });
     expect(textOf(r)).toContain("done");
-    expect(runner.lastArgs()).toEqual([script, "action", "calc", "0,1,2", "0"]);
+    expect(runner.lastArgs()).toEqual([script, "settext", "app", "搜索", "AgentOS"]);
   });
 
   it("桥失败返回 isError 而非协议错误", async () => {
@@ -61,16 +74,14 @@ describe("MCP 工具面", () => {
     expect(r.isError).toBe(true);
   });
 
-  it("策略 deny 拦截 do_action", async () => {
+  it("策略 deny 拦截 click 且不触碰桥", async () => {
     const [ct, st] = InMemoryTransport.createLinkedPair();
-    await buildServer(runner, Policy.fromRules({ a11y: { a11y_do_action: "deny" } })).connect(
-      st,
-    );
+    await buildServer(runner, Policy.fromRules({ a11y: { a11y_click: "deny" } })).connect(st);
     const c = new Client({ name: "t", version: "0" });
     await c.connect(ct);
     const r = await c.callTool({
-      name: "a11y_do_action",
-      arguments: { app: "x", path: [0] },
+      name: "a11y_click",
+      arguments: { app: "x", buttonName: "7" },
     });
     expect(r.isError).toBe(true);
     expect(textOf(r)).toContain("策略拒绝");

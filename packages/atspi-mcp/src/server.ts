@@ -14,10 +14,6 @@ function text(t: string): ToolOk {
 
 const EXT = "a11y";
 const appArg = z.string().min(1).describe("a11y 总线上的应用名（先用 a11y_list_apps 查）");
-const pathArg = z
-  .array(z.number().int().min(0))
-  .min(1)
-  .describe("从应用根出发的子节点索引路径（来自 a11y_dump_tree 的 children 顺序）");
 
 export function buildServer(
   runner: CommandRunner = new ShellRunner(),
@@ -49,7 +45,7 @@ export function buildServer(
     {
       title: "列出 a11y 应用",
       description:
-        "列出 AT-SPI2 无障碍总线上注册的应用。操作 UI 前先调这个找目标应用名（agent 会话里开的应用也会注册在这里）。",
+        "列出 AT-SPI2 无障碍总线上注册的应用。操作 UI 前先调这个找目标应用名（agent 会话里开的应用也会注册）。",
     },
     async () => text(JSON.stringify(await bridge.apps(), null, 2)),
   );
@@ -59,7 +55,7 @@ export function buildServer(
     {
       title: "倒无障碍树",
       description:
-        "导出应用的完整无障碍树（JSON：role/name/states/actions/text/children）。找按钮/输入框/文本的索引路径用它。libadwaita 嵌套深，depth 建议 16。",
+        "导出应用的无障碍树（JSON：role/name/states/actions/text/children），用于了解界面结构、找按钮名称。注意：树结构跨进程可能重建，索引路径不要跨调用使用——操作请用 a11y_click/a11y_set_text 按名称寻址。",
       inputSchema: {
         app: appArg,
         depth: z.number().int().min(1).max(16).default(16),
@@ -70,34 +66,44 @@ export function buildServer(
   );
 
   t(
-    "a11y_do_action",
+    "a11y_click",
     {
-      title: "触发控件动作",
+      title: "按名称点击按钮",
       description:
-        "对无障碍节点触发动作（按钮 click、菜单项等）——不需要窗口获得焦点，不会打扰用户。动作序号来自 dump_tree 里的 actions[index]。",
+        "在应用里按 accessible 名称点击按钮（AT-SPI2，无需焦点、不打扰用户）。例如 a11y_click('gnome-calculator', '7')。",
       inputSchema: {
         app: appArg,
-        path: pathArg,
-        actionIndex: z.number().int().min(0).default(0),
+        buttonName: z.string().min(1).describe("按钮名称（来自 dump_tree 或界面标签）"),
       },
     },
-    async ({ app, path, actionIndex }: { app: string; path: number[]; actionIndex: number }) =>
-      text(JSON.stringify(await bridge.doAction(app, path, actionIndex))),
+    async ({ app, buttonName }: { app: string; buttonName: string }) =>
+      text(JSON.stringify(await bridge.click(app, buttonName))),
+  );
+
+  t(
+    "a11y_read_texts",
+    {
+      title: "读应用内文本",
+      description: "读取应用全部非空文本节点（显示屏/结果/标签值）。读计算结果、表单当前值都用它。",
+      inputSchema: { app: appArg },
+    },
+    async ({ app }: { app: string }) => text(JSON.stringify(await bridge.texts(app), null, 2)),
   );
 
   t(
     "a11y_set_text",
     {
-      title: "设置文本框内容",
-      description: "对可编辑文本节点直接设置内容（EditableText 接口）——同样无需焦点。表单填写的主力工具。",
+      title: "按名称写文本框",
+      description:
+        "对可编辑文本节点直接设置内容（无需焦点）。match 为节点名子串，* 表示第一个可编辑节点。表单填写主力。",
       inputSchema: {
         app: appArg,
-        path: pathArg,
+        match: z.string().default("*").describe("节点名匹配子串，* 为第一个"),
         text: z.string().describe("要写入的新文本"),
       },
     },
-    async ({ app, path, text: newText }: { app: string; path: number[]; text: string }) =>
-      text(JSON.stringify(await bridge.setText(app, path, newText))),
+    async ({ app, match, text: newText }: { app: string; match: string; text: string }) =>
+      text(JSON.stringify(await bridge.setTextByMatch(app, match, newText))),
   );
 
   return server;

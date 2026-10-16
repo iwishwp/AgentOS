@@ -4,7 +4,7 @@
 
 受 [Omarchy](https://omarchy.org) 启发，技术底座与核心思路：
 
-- **底座**：CachyOS（Arch 系，btrfs 默认，性能内核）+ [niri](https://github.com/niri-wm/niri)（Rust 滚动平铺 Wayland 合成器，JSON IPC + 事件流）+ [Noctalia](https://github.com/noctalia-dev/noctalia)（QuickShell 桌面 shell，视觉参考 [LanRhyme/dotfiles](https://github.com/LanRhyme/dotfiles)）
+- **底座**：**Fedora**（[ADR-0001](docs/decisions/0001-base-distribution.md) 定案：更新安全模型与 aarch64 一等支持契合 agent OS；M5 以 Atomic/bootc 镜像发行）+ [niri](https://github.com/niri-wm/niri)（Rust 滚动平铺 Wayland 合成器，JSON IPC + 事件流）+ [Noctalia](https://github.com/noctalia-dev/noctalia)（QuickShell 桌面 shell，视觉参考 [LanRhyme/dotfiles](https://github.com/LanRhyme/dotfiles)）；CachyOS/Arch 保留为社区变体
 - **agent 引擎**：[goose](https://github.com/aaif-goose/goose)（Agentic AI Foundation / Linux Foundation，Apache-2.0），以 systemd 用户服务常驻，集成而非 fork
 - **agent 的手**：一组自研 MCP servers——窗口管理（niri IPC）、应用启动（xdg-open/portal）、文件、通知、无障碍树（AT-SPI2）等系统能力
 - **agent 的眼**（后期）：独立嵌套 GUI 会话（“水族馆”）+ AT-SPI2 无障碍树优先 + 截图指针兜底，人与 agent 并发操作互不干扰

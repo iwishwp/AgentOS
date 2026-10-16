@@ -100,10 +100,14 @@
 
 ## 7. 底座与发行
 
-- **开发期**：真机 CachyOS + niri + Noctalia（参考 LanRhyme/dotfiles 的 chezmoi 结构）；
-- **发行（M5）**：学 Omarchy 模式——`cachyos + meta-package + 一键安装脚本`先行，
-  需要时再做 archiso respin 出 ISO；不 fork 发行版；
-- btrfs（CachyOS 默认）+ snapper：agent 系统级变更前自动快照，支持一键回滚。
+> 2026-10-17 更新：基座已定案 Fedora，完整决策依据见 [decisions/0001-base-distribution.md](decisions/0001-base-distribution.md)。
+
+- **Tier 1 基座**：Fedora Workstation（开发/验证/文档主线，dnf 环境）；
+- **CachyOS/Arch**：社区变体（install.sh 与 system-mcp 的 pacman 分支保留双支持）；
+- **发行（M5）**：默认方向 **Fedora Atomic（bootc/OCI 镜像，Bazzite 模式）**——host 不可变、
+  原子更新、失败自动回滚，契合"agent 误操作可回滚"的信任架构；过渡期保留
+  "Workstation + meta-package + 一键安装脚本"路径（Omarchy 模式）；
+- btrfs + snapper（或 Atomic 自带回滚）：agent 系统级变更前自动快照，支持一键回滚。
 
 ### 7.1 架构支持策略
 

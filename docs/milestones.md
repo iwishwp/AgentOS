@@ -23,7 +23,7 @@
 范围：
 
 - 仓库、架构文档、里程碑计划、凭据设计文档；
-- 真机参考环境：CachyOS + niri + Noctalia（手工安装，形成安装笔记，为 M5 铺路）；
+- 真机参考环境：Fedora + niri + Noctalia（手工安装，安装手册见 real-machine.md；基座决策 ADR-0001）；
 - goose 以 systemd user service 方式常驻（service 单元草稿已落 `os/systemd/`，`goose serve` = ACP over HTTP/WebSocket）；
 - **`niri-mcp` v0**：窗口/工作区查询、聚焦/移动/关闭窗口、spawn 应用。
 
@@ -118,9 +118,10 @@ app=libreoffice，窗口验证 soffice 26.2）→ 通知"。意外收获：给�
 
 范围：
 
-- meta-package（pacman/AUR）：打包全部组件与默认配置；
-- 一键安装脚本（Omarchy 模式）：CachyOS 基础上一条命令得到 AgentOS；
-- archiso respin 试点（视需）；
+- **Atomic 镜像 PoC（默认方向，ADR-0001）**：基于 Fedora bootc 基础镜像构建 AgentOS OCI 镜像
+  （niri + 全组件 + 默认配置），对照 Bazzite 参考实现——host 不可变、原子更新、自动回滚；
+- 一键安装脚本（过渡路径）：Fedora Workstation 基础上一条命令得到 AgentOS（已就绪）；
+- meta-package/RPM：打包全部组件与默认配置（pacman/AUR 分支保留作社区变体）；
 - 默认配置打磨（LanRhyme 风格视觉、中文环境、输入法 fcitx5-rime）；
 - 用户文档与官网/文档站。
 

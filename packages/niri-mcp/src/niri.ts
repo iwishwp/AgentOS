@@ -12,6 +12,8 @@ export class NiriClient {
   constructor(
     private readonly runner: CommandRunner,
     bin: string = process.env["NIRI_MSG_BIN"] ?? "niri",
+    /** 每次调用附加的环境变量（如指向嵌套会话的 NIRI_SOCKET） */
+    private readonly env: Record<string, string> = {},
   ) {
     this.bin = bin;
   }
@@ -57,7 +59,7 @@ export class NiriClient {
   }
 
   private async queryJson(what: string): Promise<unknown> {
-    const r = await this.runner.run(this.bin, ["msg", "--json", what]);
+    const r = await this.runner.run(this.bin, ["msg", "--json", what], { env: this.env });
     if (r.code !== 0) {
       throw new NiriError(`niri msg --json ${what} 失败: ${describeFailure(r)}`);
     }
@@ -69,7 +71,7 @@ export class NiriClient {
   }
 
   private async action(name: string, args: string[]): Promise<void> {
-    const r = await this.runner.run(this.bin, ["msg", "action", name, ...args]);
+    const r = await this.runner.run(this.bin, ["msg", "action", name, ...args], { env: this.env });
     if (r.code !== 0) {
       throw new NiriError(`niri msg action ${name} 失败: ${describeFailure(r)}`);
     }

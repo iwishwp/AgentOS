@@ -4,6 +4,7 @@ export interface RecordedCall {
   cmd: string;
   args: string[];
   input?: string;
+  env?: Record<string, string>;
 }
 
 /** 测试替身：记录调用、按前缀返回预置结果，不真跑命令。 */
@@ -22,7 +23,7 @@ export class FakeRunner implements CommandRunner {
   }
 
   async run(cmd: string, args: string[], options: RunOptions = {}): Promise<RunResult> {
-    this.calls.push({ cmd, args, input: options.input });
+    this.calls.push({ cmd, args, input: options.input, env: options.env });
     const hit = this.replies.find((r) => r.match(args));
     return hit ? hit.result : { stdout: "", stderr: "fake: 未预置该命令的返回", code: 1 };
   }

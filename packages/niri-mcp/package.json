@@ -26,5 +26,12 @@
     "@types/node": "^26.6.5",
     "typescript": "^7.0.2",
     "vitest": "^5.0.4"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./niri": {
+      "types": "./dist/niri.d.ts",
+      "default": "./dist/niri.js"
+    }
   }
 }

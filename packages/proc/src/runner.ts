@@ -3,6 +3,8 @@ import { spawn } from "node:child_process";
 export interface RunOptions {
   /** 写入子进程 stdin 的内容，写完即关闭 stdin */
   input?: string;
+  /** 追加/覆盖的环境变量（与当前进程 env 合并） */
+  env?: Record<string, string>;
 }
 
 export interface RunResult {
@@ -19,7 +21,10 @@ export interface CommandRunner {
 export class ShellRunner implements CommandRunner {
   async run(cmd: string, args: string[], options: RunOptions = {}): Promise<RunResult> {
     return new Promise((resolve) => {
-      const p = spawn(cmd, args, { stdio: ["pipe", "pipe", "pipe"] });
+      const p = spawn(cmd, args, {
+        stdio: ["pipe", "pipe", "pipe"],
+        env: options.env ? { ...process.env, ...options.env } : process.env,
+      });
       let stdout = "";
       let stderr = "";
       p.stdout.on("data", (d) => (stdout += d));

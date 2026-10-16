@@ -1,0 +1,17 @@
+# goose CLI 首启动安装（user 单元；GOOSE_INSTALL_MODE=firstboot 时的兜底路径）
+# 构建期到 github.com 不可达（本项目实测）时，goose 由这里在开机联网后安装。
+# 已装成功则脚本盖 stamp；此处用 Condition 挡掉重复执行的输出噪音
+# （脚本本身幂等且永不失败退出——失败留给下次登录重试，不阻断会话）。
+[Unit]
+Description=AgentOS goose CLI first-boot installer (GitHub release fallback)
+After=graphical-session.target
+PartOf=graphical-session.target
+ConditionPathExists=!%h/.config/agentos/goose-installed.stamp
+
+[Service]
+Type=oneshot
+ExecStart=/usr/share/agentos/bin/install-goose.sh
+TimeoutStartSec=480
+
+[Install]
+WantedBy=graphical-session.target

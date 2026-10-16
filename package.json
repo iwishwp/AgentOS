@@ -9,7 +9,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w packages/proc && npm run build -w packages/policy && npm run build -w packages/niri-mcp && npm run build -w packages/desktop-mcp && npm run build -w packages/system-mcp && npm run build -w packages/files-mcp && npm run build -w packages/canvas && npm run build -w packages/session-mcp && npm run build -w packages/atspi-mcp && npm run build -w packages/browser-mcp",
-    "test": "npm run build && npm run test -w packages/proc && npm run test -w packages/policy && npm run test -w packages/niri-mcp && npm run test -w packages/desktop-mcp && npm run test -w packages/system-mcp && npm run test -w packages/files-mcp && npm run test -w packages/canvas && npm run test -w packages/session-mcp && npm run test -w packages/atspi-mcp && npm run test -w packages/browser-mcp"
+    "build": "npm run build -w packages/proc && npm run build -w packages/policy && npm run build -w packages/niri-mcp && npm run build -w packages/desktop-mcp && npm run build -w packages/system-mcp && npm run build -w packages/files-mcp && npm run build -w packages/canvas && npm run build -w packages/session-mcp && npm run build -w packages/atspi-mcp && npm run build -w packages/browser-mcp && npm run build -w packages/cred-mcp",
+    "test": "npm run build && npm run test -w packages/proc && npm run test -w packages/policy && npm run test -w packages/niri-mcp && npm run test -w packages/desktop-mcp && npm run test -w packages/system-mcp && npm run test -w packages/files-mcp && npm run test -w packages/canvas && npm run test -w packages/session-mcp && npm run test -w packages/atspi-mcp && npm run test -w packages/browser-mcp && npm run test -w packages/cred-mcp"
   }
 }

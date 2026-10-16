@@ -1,6 +1,7 @@
 # M5：Fedora Atomic（bootc）镜像设计与 PoC 记录
 
-- **状态**：PoC（aarch64 VM 构建验证，结果见 §构建验证）
+- **状态**：PoC 代码交付完成；VM 构建验证因网络阻断未完成（§6 + 附录），
+  转交 CI / x86_64 环境
 - **决策依据**：[ADR-0001](decisions/0001-base-distribution.md) 第 3 条——M5 发行形态默认走
   Fedora Atomic（bootc/OCI 镜像），Bazzite 生产实证模式
 - **交付物**：`os/bootc/Containerfile`、`os/bootc/{firstboot,systemd}/`、
@@ -89,9 +90,12 @@ bootc 下配置默认值的放置有两个候选，选择 **defaults + 首启动
 
 实测（VM，2026-10-16）：
 
-- `https://quay.io/v2/` → **401（正常未鉴权响应，可达）**，基础镜像拉取成功；
+- `https://quay.io/v2/` → **401（正常未鉴权响应，API 可达）**；但 blob 传输
+  被严重限速/停滞，~1.1GB 的基础镜像多次尝试未能拉完（明细与应对见文末附录）；
 - `https://github.com/.../download_cli.sh` → **55s 超时（阻断）**，与此前
-  GitHub release 直连被重置的观察一致。
+  GitHub release 直连被重置的观察一致；
+- 对照组：Fedora 镜像源 1.5 MiB/s、npm registry 正常——劣化集中在
+  quay/github 两家的大对象传输。
 
 因此 goose 默认走首启动路径：`agentos-goose-firstboot.service`（user 单元）在
 goose 缺失时调 `install-goose.sh` 重试 3 次（每次 120s 上限）装到
@@ -105,7 +109,8 @@ CI 网络可达时用 `GOOSE_INSTALL_MODE=build`（Containerfile 层 4）把 goo
   ~9.9G，内存 3.8G。
 - 命令：`./scripts/build-image.sh --smoke`（Mac 上执行：自动 rsync 仓库到
   VM `/tmp/agentos-bootc-build` 后 ssh 远程构建）。
-- 结果：见文末「验证记录」附录（构建结束后回填实测数据：镜像大小/层数/冒烟输出）。
+- 结果：**构建未完成**——基础镜像拉取被网络阻断（quay blob 传输劣化），
+  完整实测明细、已验证/未验证边界见文末「验证记录」附录。
 - 已知限制：本验证只到「容器镜像可构建、关键件在位」为止；**未做磁盘启动验证**
   （bootc-image-builder 出 RAW/QCOW2 再引导，VM 磁盘余量与 nested 虚拟化不允许，
   留给 CI/x86_64，见 §遗留清单）。
@@ -176,6 +181,42 @@ jobs:
 | 7 | 镜像瘦身 | libreoffice-writer 是体积大头之一；可评估拆分层或 Flatpak 化；node_modules 生产依赖已裁剪（--omit=dev） |
 | 8 | x86_64 Tier 1 构建 | 本机无 podman、无交叉；依赖 §7 matrix 原生 runner |
 
-## 附：验证记录
+## 附：验证记录（2026-10-16 晚，aarch64 VM，如实记录）
 
-（构建完成后回填：podman pull 结果 / build 耗时 / 镜像大小与层数 / 冒烟输出）
+**结论：构建因基础镜像拉取网络阻断未完成。代码交付完整，构建验证转交
+CI / x86_64 环境（遗留清单 #8）。**
+
+### 网络实测明细
+
+| 目标 | 结果 | 证据 |
+|---|---|---|
+| quay.io API（/v2/） | 可达 | 401（正常未鉴权响应），4.1s |
+| **quay.io blob 传输** | **严重劣化，大对象不可用** | 5 次 pull 尝试（3 次长尝试 + 2 次 300s 确认性 pull）均未完成 ~1.1GB 的 fedora-bootc:44；吞吐在 0.02–1.5 MiB/s 间剧烈波动，多次完全停滞（实测 12s 仅收 22KB ≈ 1.4KB/s）；podman 对不完整 blob 不支持断点续传，中断即丢弃，低带宽下重试无法收敛 |
+| github.com release | 阻断 | download_cli.sh 55s 超时（与既往观察一致） |
+| ghcr.io API | 可达（405） | fedora-bootc 无官方 ghcr 发布，不可作替代源 |
+| Fedora 镜像源（dnf） | 快 | alacritty 测试包 1.5 MiB/s |
+| npm registry | 快 | 200，3.5–4.2s |
+
+关键判断：**阻断只卡"一次性拉基础镜像"这一步**——dnf/npm 通道都健康，
+意味着 Containerfile 的层 1/2（dnf）、层 3（npm ci/build）在基础镜像到位后
+大概率可正常完成；但在本 VM 的网络下无法拿到入场券。累计投入约 2 小时后
+按纪律停止尝试（不设置来路不明的代理），未产生任何镜像（`podman images`
+为空，部分拉取状态已清理，磁盘 8.9G 可用）。
+
+### 已验证 / 未验证边界
+
+已验证（无需镜像构建即可确认的）：
+- F44 仓库全部包名存在性（dnf repoquery 逐一核对：niri/sddm/sddm-wayland-generic/
+  alacritty/fuzzel/swaylock/grim/mako/gnome-calculator/libreoffice-writer/
+  google-noto-sans-cjk-vf-fonts 等；nodejs 无裸包名，nodejs22 为正名）；
+- gpu-screen-recorder 不在 F44 官方仓库；COPR `arabianq/gpu-screen-recorder`
+  存在且 fedora-44-aarch64 有成功构建（Copr API 实测）；
+- `dnf5-plugins` 提供 `dnf5-command(copr)`（Containerfile 层 2 依赖）；
+- 首启动配置部署脚本逻辑（Mac 本地模拟两次部署：首次到位、用户修改不被
+  覆盖、幂等）；
+- build-image.sh 语法与 Mac→VM rsync/ssh 远程执行链路（实际跑通到 pull 阶段）。
+
+未验证（需 CI / 网络正常环境）：
+- podman build 全流程（层缓存、多阶段、bootc container lint）；
+- 镜像大小/层数、容器内冒烟（niri --version 等）；
+- SDDM+niri 登录会话真机点亮、首启动单元实际行为、goose 首启动安装。

@@ -1,0 +1,54 @@
+From 42d42029f3d24c77a99fae9dccb9b7b163f95a2b Mon Sep 17 00:00:00 2001
+From: AgentOS <agentos@local>
+Date: Fri, 16 Oct 2026 22:01:25 +0800
+Subject: [PATCH 1/4] =?UTF-8?q?spectrum:=20=E6=A1=A9=E6=8E=89=20PwAudioSpe?=
+ =?UTF-8?q?ctrum=EF=BC=88quickshell=200.2.1=20=E7=BC=BA=E8=AF=A5=E7=B1=BB?=
+ =?UTF-8?q?=E5=9E=8B=EF=BC=89?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ Services/Media/SpectrumService.qml | 25 +++++++------------------
+ 1 file changed, 7 insertions(+), 18 deletions(-)
+
+diff --git a/Services/Media/SpectrumService.qml b/Services/Media/SpectrumService.qml
+index 5cdd2b5..21f9068 100644
+--- a/Services/Media/SpectrumService.qml
++++ b/Services/Media/SpectrumService.qml
+@@ -42,25 +42,14 @@ Singleton {
+   property var values: []
+   property bool isIdle: true
+ 
+-  PwAudioSpectrum {
++  // AGENTOS-PATCH(noctalia-v4.7.1/01): PwAudioSpectrum 类型在 Fedora quickshell
++  // 0.2.1^git20260209 中不存在。用惰性 QtObject 桩掉频谱数据源：
++  // values 恒为空数组、idle 恒为 true，频谱视觉化显示为静止，其余功能不受影响。
++  // quickshell 升级后还原本块即可（见 AgentOS docs/noctalia.md）。
++  QtObject {
+     id: spectrum
+-    node: Pipewire.defaultAudioSink
+-    enabled: root._shouldRun
+-    // TODO Uncomment this in may 2026
+-    // bandCount: Settings.data.audio.spectrumMirrored ? 32 : 64
+-    frameRate: Settings.data.audio.spectrumFrameRate
+-    lowerCutoff: 50
+-    upperCutoff: 12000
+-    noiseReduction: 0.77
+-    smoothing: true
+-
+-    onValuesChanged: {
+-      root.values = spectrum.values;
+-    }
+-
+-    onIdleChanged: {
+-      root.isIdle = spectrum.idle;
+-    }
++    readonly property var values: []
++    readonly property bool idle: true
+   }
+ 
+   // TODO Remove in may 2026 - temporary until noctalia-qs is fully propagated
+-- 
+2.39.5 (Apple Git-154)
+

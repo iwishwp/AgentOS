@@ -1,0 +1,58 @@
+From 9bb2a54f1c95db4ff8c755fa89a6dde78daeb8c8 Mon Sep 17 00:00:00 2001
+From: AgentOS <agentos@local>
+Date: Fri, 16 Oct 2026 22:01:25 +0800
+Subject: [PATCH 2/4] =?UTF-8?q?compositor:=20=E7=A7=BB=E9=99=A4=20Mango=20?=
+ =?UTF-8?q?=E5=90=8E=E7=AB=AF=EF=BC=88Quickshell.DWL=20=E6=A8=A1=E5=9D=97?=
+ =?UTF-8?q?=E7=BC=BA=E5=A4=B1=EF=BC=89?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ Services/Compositor/CompositorService.qml | 23 ++++++-----------------
+ 1 file changed, 6 insertions(+), 17 deletions(-)
+
+diff --git a/Services/Compositor/CompositorService.qml b/Services/Compositor/CompositorService.qml
+index f9f7427..8e6497f 100644
+--- a/Services/Compositor/CompositorService.qml
++++ b/Services/Compositor/CompositorService.qml
+@@ -69,16 +69,10 @@ Singleton {
+     const currentDesktop = Quickshell.env("XDG_CURRENT_DESKTOP");
+     const labwcPid = Quickshell.env("LABWC_PID");
+ 
+-    // Check for MangoWC using XDG_CURRENT_DESKTOP environment variable
+-    // MangoWC sets XDG_CURRENT_DESKTOP=mango
+-    if (currentDesktop && currentDesktop.toLowerCase().includes("mango")) {
+-      isHyprland = false;
+-      isNiri = false;
+-      isSway = false;
+-      isMango = true;
+-      isLabwc = false;
+-      backendLoader.sourceComponent = mangoComponent;
+-    } else if (labwcPid && labwcPid.length > 0) {
++    // AGENTOS-PATCH(noctalia-v4.7.1/02): MangoWC 检测分支已移除——MangoService
++    // 依赖 Fedora quickshell 0.2.1 未编译的 Quickshell.DWL 模块；AgentOS 仅运行
++    // niri，isMango 恒为 false（见 AgentOS docs/noctalia.md）。
++    if (labwcPid && labwcPid.length > 0) {
+       isHyprland = false;
+       isNiri = false;
+       isSway = false;
+@@ -175,13 +169,8 @@ Singleton {
+     }
+   }
+ 
+-  // Mango backend component
+-  Component {
+-    id: mangoComponent
+-    MangoService {
+-      id: mangoBackend
+-    }
+-  }
++  // AGENTOS-PATCH(noctalia-v4.7.1/02): mangoComponent 定义已移除（Quickshell.DWL
++  // 模块缺失，MangoService 无法编译；AgentOS 仅运行 niri，见 docs/noctalia.md）。
+ 
+   // Labwc backend component
+   Component {
+-- 
+2.39.5 (Apple Git-154)
+

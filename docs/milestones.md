@@ -10,7 +10,7 @@
 | **M0** | 奠基 | 1–2 周 | ✅ 一句话让 agent 开应用、摆窗口、报系统状态（2026-10-15 达成） |
 | **M1** | 系统工具面 | 2–4 周 | ✅ 纯对话完成“下载→整理→生成文档→调起 LibreOffice”（2026-10-15 达成） |
 | **M2** | 呈现层 | 3–4 周 | 任务产物统一进 artifacts 可回看；双通道呈现可用 |
-| **M3** | agent 会话 | 4–6 周 | agent 在独立 GUI 会话完成真实网页表单且不打扰用户 |
+| **M3** | agent 会话 | 4–6 周 | ✅ 独立会话完成真实表单提交 + GUI 应用操作，零干扰（2026-10-16 达成） |
 | **M4** | 信任与安全 | 3–4 周 | 凭据零明文进上下文；误操作可回滚、可回放 |
 | **M5** | 发行 | 2–4 周 | 全新机器 30 分钟从 ISO/脚本到可用对话 |
 
@@ -74,7 +74,7 @@ app=libreoffice，窗口验证 soffice 26.2）→ 通知"。意外收获：给�
 
 退出标准：所有任务产物统一进 artifacts 且可回看；外发格式与生成式 UI 两条呈现通道可用。
 
-## M3 agent 会话（进行中 · 核心已通）
+## M3 agent 会话（✅ 2026-10-16 完成）
 
 **目标**：人机并发落地——agent 拥有自己的 GUI 会话（”水族馆”）。
 
@@ -86,7 +86,11 @@ app=libreoffice，窗口验证 soffice 26.2）→ 通知"。意外收获：给�
   感知-操作闭环成立，全程不动用户焦点）；
 - **`atspi-mcp`**：AT-SPI2 无障碍桥（列应用/倒树/**按名称点击/读写文本**——无需焦点）；✅ **已落地并真机验证**（2026-10-16：水族馆内 gnome-calculator 被 agent 全自主操作，6×7=42 显示屏读数确认；期间 agent 还自己发现并修复了桥的角色名白名单 bug）；
 - 输入注入：ydotool 受控封装——**优先级降低**：a11y 通道已覆盖主要 GUI 操作，ydotool 仅作非无障碍应用兜底；⬜ 待做
-- 浏览器自动化接入（agent 会话内浏览器）；⏸ **browser-mcp 已开发完成并经 data:URL 全链路验证**（Chromium+原生 CDP，118 测试），但本 VM 环境 Chromium 网络服务失能（含 loopback）、Firefox Marionette 端口静默——真实网站表单提交留待真机/换环境验证（详录 real-machine.md）
+- 浏览器自动化（agent 会话内浏览器）；✅ **完成**——browser-mcp（Chromium+原生 CDP，零依赖），
+  两个决定性修复：① `--password-store=basic`（钥匙环锁定会阻塞网络服务，本日悬案根因，由用户
+  在屏幕上看到的 keyring 弹窗定位）；② 默认无头启动（agent 视觉由 CDP 截图承担，有头在嵌套
+  Wayland 不稳）。退出标准实证：必应搜索表单全链路（打开→填入→提交→读第一条结果→截图→通知），
+  且百度被风控时 **agent 主动拒绝破解验证码**（行为基线的分寸条款生效）。
 - “水族馆”窗口规则（自动摆位/尺寸）；⬜ 打磨项
 
 关键技术记录（详见 real-machine.md 实测）：GTK4 需 AT 客户端注册后才暴露完整无障碍树（16→105 节点）；libadwaita 嵌套深（按钮在 8 层以下）；**树结构跨 AT 连接会重建，索引路径不可跨进程使用——操作必须按名称寻址**；GTK3/4 角色名不一致（push button vs button）。
@@ -95,11 +99,12 @@ app=libreoffice，窗口验证 soffice 26.2）→ 通知"。意外收获：给�
 
 ## M4 信任与安全
 
-**目标**：把“敢把电脑交给 agent”变成产品能力。
+**目标**：把”敢把电脑交给 agent”变成产品能力。
 
 范围：
 
 - **credential broker**（详见 [security/credentials.md](security/credentials.md)）：Secret Service（libsecret/gnome-keyring，兼容 Bitwarden/KeePassXC）为底座，1Password（CLI/Shell Plugins 模式）为增强；agent 拿能力不拿明文；
+- **Keyring 自动解锁（M4 前置验收项）**：登录后 `org.freedesktop.secrets` 无弹窗直接可用、daemon 单实例（PAM 已就位，实测存在 dbus 激活实例与 PAM 解锁状态分裂，方案见 credentials.md §5.1）；
 - 权限分级 v1：portal/polkit 集成，确认粒度“每次/仅此一次/永不”；
 - 审计日志：agent 全部工具调用结构化落盘；
 - 会话录屏与回放：gpu-screen-recorder 录 agent 会话；

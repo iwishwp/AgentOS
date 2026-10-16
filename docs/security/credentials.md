@@ -89,6 +89,26 @@ vault://github/token:
 - **审计（M4）**：broker 每次放行记录“谁、哪条引用、哪个通道、何时”，录屏对通道 A 的填充画面自动打码或不录；
 - **权限分级（M4）**：凭据使用属于最高级确认档，与工具级 allowlist 联动。
 
+## 5.1 Keyring 自动解锁（M4 前置，实测教训）
+
+2026-10-16 悬案复盘：SSH/headless 拉起的 Chromium 经 libsecret 访问 GNOME 钥匙环解密
+Cookie，钥匙环未解锁 → 弹 "Unlock login Keyring" 对话框 → **网络服务阻塞等待，表现为
+一切 http/https 导航挂死**（data: URL 不碰网络所以正常，极具迷惑性）。由用户在屏幕上
+看到弹窗定位，`--password-store=basic` 即解（已固化进 browser-mcp）。
+
+自动解锁的分层方案：
+
+1. **PAM 层（已就位，待验证）**：Fedora 的 gdm-password PAM 栈已含
+   `pam_gnome_keyring auto_start`，正常 GDM 登录应自动解锁登录钥匙环。实测弹窗说明
+   存在状态分裂——dbus 激活的 gnome-keyring-daemon 实例未继承 PAM 解锁状态
+   （多会话/嵌套环境典型问题；VM 上 gnome-keyring-daemon.socket 为 inactive）。
+   **M4 验收项：登录后 `org.freedesktop.secrets` 无弹窗直接可用；守护进程全用户单实例。**
+2. **Broker 层（根治）**：agent 相关进程一律经 credential broker 访问 Secret Service，
+   broker 运行在已解锁的图形会话上下文里，保证连到"正确的那只" daemon——多实例分裂
+   从架构上消除。
+3. **隔离层（已做）**：自动化浏览器用独立 profile + `--password-store=basic`，
+   永不触碰用户钥匙环——自动化环境本来就不该读用户密钥（隐私边界，不是妥协）。
+
 ## 6. 待决问题（Open Questions）
 
 - 通道 B 的“代为执行”与 M1 权限模型中“敏感动作确认”如何合并为一个 UX；

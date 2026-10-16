@@ -234,8 +234,13 @@ export class BrowserClient {
       [
         `--remote-debugging-port=${this.port}`,
         `--user-data-dir=${this.userDataDir}`,
+        // 关键：headless/服务化环境必须跳过钥匙环——Chromium 经 libsecret 解密 Cookie，
+        // 钥匙环锁定时网络服务会阻塞等待解锁对话框，表现为一切 http/https 导航挂死
+        // （data: URL 正常的假象即来源于此，实测 2026-10-16）
+        "--password-store=basic",
         "--no-first-run",
         "--no-default-browser-check",
+        "--disable-gpu",
         "--ozone-platform-hint=auto",
         "--window-size=1200,860",
         "about:blank",

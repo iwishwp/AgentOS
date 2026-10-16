@@ -1,0 +1,173 @@
+// AgentOS 默认 niri 配置模板
+//
+// 键位方案借鉴 Omarchy（DHH 的 Arch+Hyprland 发行版，文档站 omarchy.org，
+// 仓库 github.com/basecamp/omarchy —— 现跳转至 github.com/omacom/omarchy），
+// 原则：用到哪些功能就抄哪些键位，不照单全收。
+// 完整调研与取舍理由：docs/omarchy-keybindings-research.md；用户侧说明：docs/keyboard.md
+//
+// 语法对照 niri 官方默认配置（仓库 resources/default-config.kdl）与
+// wiki 键位文档（https://niri-wm.github.io/niri/Configuration:-Key-Bindings），
+// 动作名逐个核对过拼写（2026-10，niri 26.04 为 VM 实测版本）。
+//
+// ⚠️ 尚未在真机运行 `niri validate`，待验证（见 docs/keyboard.md「已知冲突与取舍」）。
+//
+// ⚠️ 重要语义：binds 段一旦出现，niri 内置的完整默认键位即被整体替换
+// （不与默认值合并——wiki 明确提醒过）。因此本文件就是完整键位表；
+// 焦点移动等默认键位只保留了子集需要的部分，需要更多时从官方
+// default-config.kdl 里拷贝对应行。
+
+// 通知守护进程（desktop-mcp 的通知工具依赖它）
+spawn-at-startup "mako"
+
+// 截图保存路径（strftime(3) 格式；截图同时会进入剪贴板；设为 null 可不落盘）
+screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
+
+binds {
+    // ============ 启动应用 ============
+
+    // 终端（alacritty）：Omarchy 的 Super+Return 原样采纳
+    Super+Return { spawn "alacritty"; }
+
+    // 终端别名：niri 默认 Mod+T 保留（现有文档与肌肉记忆沿用）。
+    // 不用 Super+T 开终端：Omarchy 里 Super+T 是"平铺/浮动切换"而非终端，
+    // 且 Mac 用户 ⌘T=新标签页的肌肉记忆容易误开一串终端——详见 docs/keyboard.md
+    Mod+T hotkey-overlay-title="Terminal: alacritty" { spawn "alacritty"; }
+
+    // 启动器（fuzzel）：Omarchy 的 Super+Space（Omarchy menu）键位原样采纳，
+    // 菜单实现换成我们实际用的 fuzzel
+    Super+Space { spawn "fuzzel"; }
+
+    // 启动器别名：niri 默认 Mod+D 保留
+    Mod+D hotkey-overlay-title="App Launcher: fuzzel" { spawn "fuzzel"; }
+
+    // 浏览器（firefox）：Omarchy 的 Super+Shift+Return 原样采纳
+    //（Omarchy 按发行版默认浏览器启动，我们固定为 firefox）
+    Super+Shift+Return { spawn "firefox"; }
+
+    // ============ 窗口操作 ============
+
+    // 关闭窗口：Omarchy 的 Super+W 原样采纳
+    //（代价：niri 默认把该键给"标签页显示"，该功能不在子集内，让位）
+    Super+W { close-window; }
+
+    // 关闭窗口别名：niri 默认 Mod+Q 保留——在 TTY 会话上 Mod 即 Super，
+    // 与 Omarchy 的 Super+Q 是同一个物理键、同一语义
+    Mod+Q repeat=false { close-window; }
+
+    // 关闭窗口别名：通用惯例 Alt+F4 保留（niri 默认）
+    Alt+F4 repeat=false { close-window; }
+
+    // 全屏：Omarchy 的 Super+F 键位原样采纳。
+    // 动作取 niri 的真全屏 fullscreen-window（替换 niri 默认在此键上的 maximize-column）
+    Super+F { fullscreen-window; }
+
+    // 平铺全屏：Omarchy 的 Super+Ctrl+F"Tiled full screen"，
+    // 对应 niri 的 maximize-column（撑满但保留边距/边框的"全屏"）
+    Super+Ctrl+F { maximize-column; }
+
+    // ============ 工作区 ============
+
+    // 切换到工作区 1-9：Omarchy（Super+数字）与 niri 默认（Mod+数字）本就一致
+    Mod+1 { focus-workspace 1; }
+    Mod+2 { focus-workspace 2; }
+    Mod+3 { focus-workspace 3; }
+    Mod+4 { focus-workspace 4; }
+    Mod+5 { focus-workspace 5; }
+    Mod+6 { focus-workspace 6; }
+    Mod+7 { focus-workspace 7; }
+    Mod+8 { focus-workspace 8; }
+    Mod+9 { focus-workspace 9; }
+
+    // 下一个/上一个工作区：Omarchy 的 Super+Tab / Super+Shift+Tab 原样采纳。
+    // niri 的工作区是纵向栈，focus-workspace-down/up 即"顺序的下一个/上一个"
+    Super+Tab      { focus-workspace-down; }
+    Super+Shift+Tab { focus-workspace-up; }
+
+    // 回到上一个使用的工作区：Omarchy 的 Super+Ctrl+Tab"Former workspace"键位原样采纳，
+    // 动作是 niri 官方示例中的 focus-workspace-previous（当前↔上一个来回切）
+    Super+Ctrl+Tab { focus-workspace-previous; }
+
+    // 工作区纵向切换别名：niri 默认 Mod+U / Mod+I 保留（与 Super+Tab 对等）
+    Mod+U { focus-workspace-down; }
+    Mod+I { focus-workspace-up; }
+
+    // 把当前窗口（列）移到工作区 1-9：Omarchy 的 Super+Shift+数字 原样采纳。
+    // niri 的窗口单位是"列"，move-column-to-workspace 与 Omarchy 的
+    // "move window to workspace"语义等价（单窗口列即窗口本身）
+    Super+Shift+1 { move-column-to-workspace 1; }
+    Super+Shift+2 { move-column-to-workspace 2; }
+    Super+Shift+3 { move-column-to-workspace 3; }
+    Super+Shift+4 { move-column-to-workspace 4; }
+    Super+Shift+5 { move-column-to-workspace 5; }
+    Super+Shift+6 { move-column-to-workspace 6; }
+    Super+Shift+7 { move-column-to-workspace 7; }
+    Super+Shift+8 { move-column-to-workspace 8; }
+    Super+Shift+9 { move-column-to-workspace 9; }
+
+    // 移动窗口别名：niri 默认 Mod+Ctrl+数字 保留
+    Mod+Ctrl+1 { move-column-to-workspace 1; }
+    Mod+Ctrl+2 { move-column-to-workspace 2; }
+    Mod+Ctrl+3 { move-column-to-workspace 3; }
+    Mod+Ctrl+4 { move-column-to-workspace 4; }
+    Mod+Ctrl+5 { move-column-to-workspace 5; }
+    Mod+Ctrl+6 { move-column-to-workspace 6; }
+    Mod+Ctrl+7 { move-column-to-workspace 7; }
+    Mod+Ctrl+8 { move-column-to-workspace 8; }
+    Mod+Ctrl+9 { move-column-to-workspace 9; }
+
+    // ============ 总览 / 截图 / 锁屏 / 退出 ============
+
+    // niri 总览（缩放鸟瞰所有工作区与窗口）：niri 原生保留
+    //（Omarchy/Hyprland 默认键位无此概念）。
+    // 注意动作名是 toggle-overview，不是 overview——以 wiki 为准核对过
+    Mod+O repeat=false { toggle-overview; }
+
+    // 截图（交互式 UI：选区/窗口/整屏，复制进剪贴板并落盘）：
+    // Omarchy 与 niri 默认都在 Print 键上，一致采纳
+    Print { screenshot; }
+
+    // 截图别名：Omarchy 的 Super+Shift+S 原样采纳——
+    // Mac 键盘没有 Print 键，这是 Mac + Fusion 用户的主路径
+    Super+Shift+S { screenshot; }
+
+    // 直接整屏截图 / 当前窗口截图：niri 默认保留
+    Ctrl+Print { screenshot-screen; }
+    Alt+Print { screenshot-window; }
+
+    // 锁屏：Omarchy 的 Super+Ctrl+L 原样采纳
+    //（Omarchy 同样是拉起外部锁屏器，我们的锁屏器是 swaylock）
+    Super+Ctrl+L { spawn "swaylock"; }
+
+    // 锁屏别名：niri 官方建议键位 Super+Alt+L 保留
+    Super+Alt+L hotkey-overlay-title="Lock: swaylock" { spawn "swaylock"; }
+
+    // 退出 niri：niri 默认 Mod+Shift+E 保留（quit 自带确认对话框，防误触）。
+    // Omarchy 的 Super+Escape"系统菜单"未采纳：niri 没有 power-off-menu 之类的
+    // 系统菜单动作（以 wiki 动作清单核对），退出语义由 quit 承担；
+    // Super+Escape 这个键位保留给下面 niri 默认的"快捷键抑制逃生门"
+    Mod+Shift+E { quit; }
+    Ctrl+Alt+Delete { quit; }
+
+    // ============ 保留的 niri 默认（可用性垫底，非 Omarchy 借鉴） ============
+
+    // 快捷键速查浮层：niri 默认 Mod+Shift+Slash，另采纳 Omarchy 的
+    // Super+K"显示键位表"作为同义键（Omarchy 心智）
+    Mod+Shift+Slash { show-hotkey-overlay; }
+    Super+K { show-hotkey-overlay; }
+
+    // 快捷键抑制逃生门（niri 默认）：远程桌面类应用可请求合成器停用快捷键，
+    // 此键反制，避免被恶意/异常应用"劫持键盘"（allow-inhibiting=false 保证永远生效）
+    Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
+
+    // 焦点移动（方向键）：niri 默认保留——没有它们，多窗口时无法用键盘切焦点
+    Mod+Left  { focus-column-left; }
+    Mod+Down  { focus-window-down; }
+    Mod+Up    { focus-window-up; }
+    Mod+Right { focus-column-right; }
+
+    // 移动窗口/列位置（方向键）：niri 默认保留
+    Mod+Ctrl+Left  { move-column-left; }
+    Mod+Ctrl+Down  { move-window-down; }
+    Mod+Ctrl+Up    { move-window-up; }
+    Mod+Ctrl+Right { move-column-right; }
+}

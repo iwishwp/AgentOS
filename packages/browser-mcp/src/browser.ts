@@ -230,6 +230,7 @@ export class BrowserClient {
       throw new BrowserError("未发现水族馆（agent 会话）——先用 session__agent_session_start 启动");
     }
     fs.mkdirSync(this.userDataDir, { recursive: true });
+    const headed = process.env["AGENTOS_BROWSER_HEADED"] === "1";
     this.launch(
       [
         `--remote-debugging-port=${this.port}`,
@@ -238,10 +239,13 @@ export class BrowserClient {
         // 钥匙环锁定时网络服务会阻塞等待解锁对话框，表现为一切 http/https 导航挂死
         // （data: URL 正常的假象即来源于此，实测 2026-10-16）
         "--password-store=basic",
+        // 默认无头：agent 的视觉由 CDP 截图承担；有头模式在嵌套 Wayland 环境不稳定
+        // （ozone 自动选择 + 渲染进程交换问题，实测），需要围观时设 AGENTOS_BROWSER_HEADED=1
+        ...(headed ? [] : ["--headless=new"]),
         "--no-first-run",
         "--no-default-browser-check",
         "--disable-gpu",
-        "--ozone-platform-hint=auto",
+        "--ozone-platform=wayland",
         "--window-size=1200,860",
         "about:blank",
       ],

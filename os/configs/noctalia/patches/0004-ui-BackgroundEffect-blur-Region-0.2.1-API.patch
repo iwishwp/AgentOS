@@ -1,0 +1,154 @@
+From 8a0b07678347f39ec49b0c88c082f90f30891883 Mon Sep 17 00:00:00 2001
+From: AgentOS <agentos@local>
+Date: Fri, 16 Oct 2026 22:01:52 +0800
+Subject: [PATCH 4/4] =?UTF-8?q?ui:=20=E7=A7=BB=E9=99=A4=20BackgroundEffect?=
+ =?UTF-8?q?=20=E6=A8=A1=E7=B3=8A=E4=B8=8E=20blur=20Region=20=E6=A0=91?=
+ =?UTF-8?q?=EF=BC=880.2.1=20=E7=BC=BA=E8=AF=A5=20API=EF=BC=89?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ Modules/Dock/Dock.qml                         | 13 +---
+ Modules/MainScreen/MainScreen.qml             | 63 +------------------
+ .../Panels/Launcher/LauncherOverlayWindow.qml | 26 +-------
+ 3 files changed, 7 insertions(+), 95 deletions(-)
+
+diff --git a/Modules/Dock/Dock.qml b/Modules/Dock/Dock.qml
+index 508fa18..35d4e0b 100644
+--- a/Modules/Dock/Dock.qml
++++ b/Modules/Dock/Dock.qml
+@@ -854,17 +854,8 @@ Loader {
+           readonly property real slideY: dockPosition === "top" ? -slideOffset : dockPosition === "bottom" ? slideOffset : 0
+ 
+           // Blur behind dock — offset by slide so it follows the content
+-          BackgroundEffect.blurRegion: Settings.data.general.enableBlurBehind ? dockBlurRegion : null
+-          Region {
+-            id: dockBlurRegion
+-            Region {
+-              x: Math.round(dockContainerWrapper.x + dockContent.dockContainer.x + dockWindow.slideX)
+-              y: Math.round(dockContainerWrapper.y + dockContent.dockContainer.y + dockWindow.slideY)
+-              width: Math.round(dockContent.dockContainer.width)
+-              height: Math.round(dockContent.dockContainer.height)
+-              radius: Style.radiusL
+-            }
+-          }
++          // AGENTOS-PATCH(noctalia-v4.7.1/04): BackgroundEffect 不可用（同 MainScreen）。
++      // AGENTOS-PATCH(noctalia-v4.7.1/04): dockBlurRegion Region 树已随 BackgroundEffect 一并移除。
+ 
+           // Window sized to fit content + slide distance so content can slide off-edge.
+           // When auto-hide is disabled, slideDistance is 0 so the window (and thus
+diff --git a/Modules/MainScreen/MainScreen.qml b/Modules/MainScreen/MainScreen.qml
+index 4526a29..8d6c638 100644
+--- a/Modules/MainScreen/MainScreen.qml
++++ b/Modules/MainScreen/MainScreen.qml
+@@ -202,66 +202,9 @@ PanelWindow {
+   }
+ 
+   // Blur behind the bar and open panels — attached to PanelWindow (required by BackgroundEffect API)
+-  BackgroundEffect.blurRegion: Settings.data.general.enableBlurBehind ? blurRegion : null
+-  Region {
+-    id: blurRegion
+-    // ── Non-framed bar (simple/floating): single rectangle with bar corner states ──
+-    Region {
+-      x: (!barPlaceholder.isFramed && root.barShouldShow && !barPlaceholder.isHidden) ? barPlaceholder.x : 0
+-      y: (!barPlaceholder.isFramed && root.barShouldShow && !barPlaceholder.isHidden) ? barPlaceholder.y : 0
+-      width: (!barPlaceholder.isFramed && root.barShouldShow && !barPlaceholder.isHidden) ? barPlaceholder.width : 0
+-      height: (!barPlaceholder.isFramed && root.barShouldShow && !barPlaceholder.isHidden) ? barPlaceholder.height : 0
+-      radius: Style.radiusL
+-      topLeftCorner: barPlaceholder.topLeftCornerState
+-      topRightCorner: barPlaceholder.topRightCornerState
+-      bottomLeftCorner: barPlaceholder.bottomLeftCornerState
+-      bottomRightCorner: barPlaceholder.bottomRightCornerState
+-    }
+-
+-    // ── Framed bar: full screen minus rounded hole ──
+-    Region {
+-      x: 0
+-      y: 0
+-      width: (barPlaceholder.isFramed && root.barShouldShow && !barPlaceholder.isHidden) ? root.width : 0
+-      height: (barPlaceholder.isFramed && root.barShouldShow && !barPlaceholder.isHidden) ? root.height : 0
+-
+-      Region {
+-        intersection: Intersection.Subtract
+-        x: backgroundBlur.frameHoleX
+-        y: backgroundBlur.frameHoleY
+-        width: backgroundBlur.frameHoleX2 - backgroundBlur.frameHoleX
+-        height: backgroundBlur.frameHoleY2 - backgroundBlur.frameHoleY
+-        radius: backgroundBlur.frameR
+-      }
+-    }
+-
+-    // ── Panel blur regions ──
+-    // Opening panel
+-    Region {
+-      x: backgroundBlur.panelBg ? Math.round(backgroundBlur.panelBg.x) : 0
+-      y: backgroundBlur.panelBg ? Math.round(backgroundBlur.panelBg.y) : 0
+-      width: backgroundBlur.panelBg ? Math.round(backgroundBlur.panelBg.width) : 0
+-      height: backgroundBlur.panelBg ? Math.round(backgroundBlur.panelBg.height) : 0
+-      radius: Style.radiusL
+-      topLeftCorner: backgroundBlur.panelBg ? backgroundBlur.panelBg.topLeftCornerState : CornerState.Normal
+-      topRightCorner: backgroundBlur.panelBg ? backgroundBlur.panelBg.topRightCornerState : CornerState.Normal
+-      bottomLeftCorner: backgroundBlur.panelBg ? backgroundBlur.panelBg.bottomLeftCornerState : CornerState.Normal
+-      bottomRightCorner: backgroundBlur.panelBg ? backgroundBlur.panelBg.bottomRightCornerState : CornerState.Normal
+-    }
+-
+-    // Closing panel (coexists with opening panel during transition)
+-    Region {
+-      x: backgroundBlur.closingPanelBg ? Math.round(backgroundBlur.closingPanelBg.x) : 0
+-      y: backgroundBlur.closingPanelBg ? Math.round(backgroundBlur.closingPanelBg.y) : 0
+-      width: backgroundBlur.closingPanelBg ? Math.round(backgroundBlur.closingPanelBg.width) : 0
+-      height: backgroundBlur.closingPanelBg ? Math.round(backgroundBlur.closingPanelBg.height) : 0
+-      radius: Style.radiusL
+-      topLeftCorner: backgroundBlur.closingPanelBg ? backgroundBlur.closingPanelBg.topLeftCornerState : CornerState.Normal
+-      topRightCorner: backgroundBlur.closingPanelBg ? backgroundBlur.closingPanelBg.topRightCornerState : CornerState.Normal
+-      bottomLeftCorner: backgroundBlur.closingPanelBg ? backgroundBlur.closingPanelBg.bottomLeftCornerState : CornerState.Normal
+-      bottomRightCorner: backgroundBlur.closingPanelBg ? backgroundBlur.closingPanelBg.bottomRightCornerState : CornerState.Normal
+-    }
+-  }
++  // AGENTOS-PATCH(noctalia-v4.7.1/04): BackgroundEffect 在 quickshell 0.2.1 中不存在，
++  // blur 装饰不可用（见 AgentOS docs/noctalia.md）。
++      // AGENTOS-PATCH(noctalia-v4.7.1/04): blurRegion Region 树已随 BackgroundEffect 一并移除。
+ 
+   // --------------------------------------
+   // Container for all UI elements
+diff --git a/Modules/Panels/Launcher/LauncherOverlayWindow.qml b/Modules/Panels/Launcher/LauncherOverlayWindow.qml
+index 3b1b2c8..dbd7dba 100644
+--- a/Modules/Panels/Launcher/LauncherOverlayWindow.qml
++++ b/Modules/Panels/Launcher/LauncherOverlayWindow.qml
+@@ -40,30 +40,8 @@ Variants {
+       WlrLayershell.layer: WlrLayer.Overlay
+       WlrLayershell.exclusionMode: ExclusionMode.Ignore
+ 
+-      BackgroundEffect.blurRegion: Settings.data.general.enableBlurBehind ? launcherBlurRegion : null
+-      Region {
+-        id: launcherBlurRegion
+-
+-        Region {
+-          x: Math.round(launcherPanel.x)
+-          y: Math.round(launcherPanel.y)
+-          width: Math.round(launcherPanel.width)
+-          height: Math.round(launcherPanel.height)
+-          radius: Style.radiusL
+-          topLeftCorner: launcherPanel.topLeftCornerState
+-          topRightCorner: launcherPanel.topRightCornerState
+-          bottomLeftCorner: launcherPanel.bottomLeftCornerState
+-          bottomRightCorner: launcherPanel.bottomRightCornerState
+-        }
+-
+-        Region {
+-          x: Math.round(previewBox.visible ? previewBox.x : 0)
+-          y: Math.round(previewBox.visible ? previewBox.y : 0)
+-          width: Math.round(previewBox.visible ? previewBox.width : 0)
+-          height: Math.round(previewBox.visible ? previewBox.height : 0)
+-          radius: Style.radiusL
+-        }
+-      }
++      // AGENTOS-PATCH(noctalia-v4.7.1/04): BackgroundEffect 不可用（同 MainScreen）。
++      // AGENTOS-PATCH(noctalia-v4.7.1/04): launcherBlurRegion Region 树已随 BackgroundEffect 一并移除。
+ 
+       // Positioning logic (respects settings but doesn't attach to bar)
+       readonly property string barPosition: Settings.data.bar.position
+-- 
+2.39.5 (Apple Git-154)
+

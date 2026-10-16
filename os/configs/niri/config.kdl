@@ -19,8 +19,9 @@
 // 通知守护进程（desktop-mcp 的通知工具依赖它）
 spawn-at-startup "mako"
 
-// 状态栏（waybar：Fedora quickshell 版本暂不满足 Noctalia v4 的过渡方案）
-spawn-at-startup "waybar"
+// 状态栏/桌面 shell（Noctalia v4.7.1 + AgentOS 兼容补丁；安装见 scripts/install-noctalia.sh，
+// 版本论证见 docs/noctalia.md。waybar 配置保留在 os/configs/waybar/ 作为回退）
+spawn-at-startup "qs" "-c" "noctalia"
 
 // 美学配置（布局/动画/色板），见 os/configs/theming/niri/aesthetics.kdl
 // include 语义为文档拼接：layout 与 animations 段只在那个文件里定义，勿在此重复

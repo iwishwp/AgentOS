@@ -1,0 +1,57 @@
+From 981877e0c62c64d4b8935aa4e1c581de9a123ee0 Mon Sep 17 00:00:00 2001
+From: AgentOS <agentos@local>
+Date: Fri, 16 Oct 2026 22:01:38 +0800
+Subject: [PATCH 3/4] =?UTF-8?q?compositor:=20=E7=A7=BB=E9=99=A4=20Labwc=20?=
+ =?UTF-8?q?=E5=90=8E=E7=AB=AF=EF=BC=88Quickshell.WindowManager=20=E6=A8=A1?=
+ =?UTF-8?q?=E5=9D=97=E7=BC=BA=E5=A4=B1=EF=BC=89?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ Services/Compositor/CompositorService.qml | 22 ++++++----------------
+ 1 file changed, 6 insertions(+), 16 deletions(-)
+
+diff --git a/Services/Compositor/CompositorService.qml b/Services/Compositor/CompositorService.qml
+index 8e6497f..7a09d96 100644
+--- a/Services/Compositor/CompositorService.qml
++++ b/Services/Compositor/CompositorService.qml
+@@ -72,15 +72,10 @@ Singleton {
+     // AGENTOS-PATCH(noctalia-v4.7.1/02): MangoWC 检测分支已移除——MangoService
+     // 依赖 Fedora quickshell 0.2.1 未编译的 Quickshell.DWL 模块；AgentOS 仅运行
+     // niri，isMango 恒为 false（见 AgentOS docs/noctalia.md）。
+-    if (labwcPid && labwcPid.length > 0) {
+-      isHyprland = false;
+-      isNiri = false;
+-      isSway = false;
+-      isMango = false;
+-      isLabwc = true;
+-      backendLoader.sourceComponent = labwcComponent;
+-      Logger.i("CompositorService", "Detected LabWC with PID: " + labwcPid);
+-    } else if (niriSocket && niriSocket.length > 0) {
++    // AGENTOS-PATCH(noctalia-v4.7.1/03): LabWC 检测分支已移除——LabwcService
++    // 依赖 Fedora quickshell 0.2.1 未编译的 Quickshell.WindowManager 模块；
++    // AgentOS 仅运行 niri，isLabwc 恒为 false（见 AgentOS docs/noctalia.md）。
++    if (niriSocket && niriSocket.length > 0) {
+       isHyprland = false;
+       isNiri = true;
+       isSway = false;
+@@ -172,13 +167,8 @@ Singleton {
+   // AGENTOS-PATCH(noctalia-v4.7.1/02): mangoComponent 定义已移除（Quickshell.DWL
+   // 模块缺失，MangoService 无法编译；AgentOS 仅运行 niri，见 docs/noctalia.md）。
+ 
+-  // Labwc backend component
+-  Component {
+-    id: labwcComponent
+-    LabwcService {
+-      id: labwcBackend
+-    }
+-  }
++  // AGENTOS-PATCH(noctalia-v4.7.1/03): labwcComponent 定义已移除（Quickshell.
++  // WindowManager 模块缺失，LabwcService 无法编译；AgentOS 仅运行 niri）。
+ 
+   function setupBackendConnections() {
+     if (!backend)
+-- 
+2.39.5 (Apple Git-154)
+

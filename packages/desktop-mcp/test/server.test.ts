@@ -23,11 +23,12 @@ function textOf(result: { content: unknown }): string {
 }
 
 describe("MCP 工具面", () => {
-  it("注册 4 个工具", async () => {
+  it("注册 5 个工具（含 T1 确认入口 confirm）", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       "clipboard_read",
       "clipboard_write",
+      "confirm",
       "notify",
       "open",
     ]);

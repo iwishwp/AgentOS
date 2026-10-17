@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { CommandRunner } from "@agentos/proc";
 import { ShellRunner } from "@agentos/proc";
-import { Policy, audit } from "@agentos/policy";
+import { Policy, ConfirmClient, createGate, summarizeArgs } from "@agentos/policy";
 import { NiriClient, NiriError } from "./niri.js";
 
 const windowId = z.number().int().describe("窗口 id（来自 list_windows 的 id 字段）");
@@ -32,19 +32,14 @@ export function buildServer(
   const server = new McpServer({ name: "niri-mcp", version: "0.1.0" });
   const niri = new NiriClient(runner);
 
-  // 统一注册入口：先过策略（allow/deny + 审计），再进 handler
-  const t = ((name: string, config: Parameters<McpServer["registerTool"]>[1], cb: any) =>
-    server.registerTool(name, config, async (args: unknown) => {
-      const verdict = policy.decide(EXT, name);
-      audit({ ts: new Date().toISOString(), extension: EXT, tool: name, decision: verdict.decision });
-      if (verdict.decision === "deny") {
-        return {
-          content: [{ type: "text" as const, text: `策略拒绝 ${EXT}.${name}（${verdict.reason}）。可在 ~/.config/agentos/policy.yaml 调整。` }],
-          isError: true,
-        };
-      }
-      return cb(args);
-    })) as McpServer["registerTool"];
+  // 统一注册入口：先过策略（allow/deny/confirm + 审计 + T1 确认流），再进 handler
+  const t = createGate({
+    server,
+    extension: EXT,
+    policy,
+    confirm: new ConfirmClient(),
+    summary: (_tool, args) => summarizeArgs(args),
+  }) as McpServer["registerTool"];
 
   t(
     "list_windows",

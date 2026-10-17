@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { CommandRunner } from "@agentos/proc";
 import { ShellRunner } from "@agentos/proc";
-import { Policy, audit } from "@agentos/policy";
+import { Policy, ConfirmClient, audit, createGate, summarizeArgs } from "@agentos/policy";
 import { DesktopClient, DesktopError } from "./desktop.js";
 
 type ToolOk = { content: [{ type: "text"; text: string }] };
@@ -30,20 +30,16 @@ export function buildServer(
 ): McpServer {
   const server = new McpServer({ name: "desktop-mcp", version: "0.1.0" });
   const desktop = new DesktopClient(runner);
+  const confirmClient = new ConfirmClient();
 
-  // 统一注册入口：先过策略（allow/deny + 审计），再进 handler
-  const t = ((name: string, config: Parameters<McpServer["registerTool"]>[1], cb: any) =>
-    server.registerTool(name, config, async (args: unknown) => {
-      const verdict = policy.decide(EXT, name);
-      audit({ ts: new Date().toISOString(), extension: EXT, tool: name, decision: verdict.decision });
-      if (verdict.decision === "deny") {
-        return {
-          content: [{ type: "text" as const, text: `策略拒绝 ${EXT}.${name}（${verdict.reason}）。可在 ~/.config/agentos/policy.yaml 调整。` }],
-          isError: true,
-        };
-      }
-      return cb(args);
-    })) as McpServer["registerTool"];
+  // 统一注册入口：先过策略（allow/deny/confirm + 审计 + T1 确认流），再进 handler
+  const t = createGate({
+    server,
+    extension: EXT,
+    policy,
+    confirm: confirmClient,
+    summary: (_tool, args) => summarizeArgs(args),
+  }) as McpServer["registerTool"];
 
   t(
     "open",
@@ -124,6 +120,50 @@ export function buildServer(
       guard(async () => {
         await desktop.clipboardWrite(t);
         return text(`已写入剪贴板（${t.length} 字符）`);
+      }),
+  );
+
+  t(
+    "confirm",
+    {
+      title: "向用户发起确认（T1 通道入口）",
+      description:
+        "向用户弹一条带按钮的确认通知（org.agentos.Confirm1 → mako），阻塞等待选择：" +
+        "allow_once 允许一次 / allow_session 本次会话允许 / deny_once 拒绝 / always_deny 永不；30 秒无响应视为拒绝。" +
+        "适用：agent 主动向用户请示（工具策略之外的决定点）。注意 summary 里不要放任何敏感内容——它会显示在通知里。",
+      inputSchema: {
+        summary: z
+          .string()
+          .min(1)
+          .max(300)
+          .describe("给用户看的问题/事项摘要（一行，脱敏）"),
+        tier: z.enum(["t1", "t2"]).default("t1").describe("档位标注（影响通知文案）"),
+      },
+    },
+    async ({ summary, tier }) =>
+      guard(async () => {
+        const outcome = await confirmClient.ask("agent", "question", summary, tier);
+        audit({
+          ts: new Date().toISOString(),
+          extension: EXT,
+          tool: "confirm",
+          decision: outcome.choice.startsWith("allow") ? "allow" : "deny",
+          tier,
+          confirm: {
+            asked: true,
+            result: outcome.choice,
+            by: outcome.by,
+            response_ms: outcome.responseMs,
+          },
+        });
+        if (outcome.unavailable) {
+          throw new DesktopError(
+            "确认服务 org.agentos.Confirm1 不可用（systemctl --user status agentos-confirm）",
+          );
+        }
+        return text(
+          `用户选择: ${outcome.choice}（by ${outcome.by}，${(outcome.responseMs / 1000).toFixed(1)}s 响应）`,
+        );
       }),
   );
 

@@ -69,26 +69,27 @@ niri 配置里的 `Super`（及 `Mod`，在 TTY 会话中 Mod 即 Super）物理
 > 截图默认保存到 `~/Pictures/Screenshots/` 并同时进入剪贴板（`screenshot-path` 可改）。
 > 锁屏需要安装 swaylock：`sudo dnf install swaylock`（Arch 系：`sudo pacman -S swaylock`）。
 
-### 2.1 键位速查页（Super+K）
+### 2.1 键位速查（Super+K：系统浮层 + agent 网页版）
 
-`Super+K` 不再打开 niri 内置 hotkey overlay，而是弹出 canvas 服务的键位速查页
-（`http://127.0.0.1:7788/keys`，chromium `--app` 应用窗口）：
+`Super+K` 弹出 **layer-shell 浮层**（`qs -c agentos-hotkeys`，Omarchy/niri 原生心智：
+居中面板、压暗背景、一行一条，Esc/点按即关，进程即起即退无常驻）：
 
-- **整页上下滚动**——Omarchy 心智：键位多于一屏是常态，翻页看；
-- **分组吸顶**——配置 binds 段里的 `// ==== 分组 ====` 注释即页面分组，滚到哪
-  节、节标题钉在视口顶部；
-- **输入即过滤**——右上过滤框，`/` 聚焦、`Esc` 清空，按功能/动作/键位子串筛；
-- **数据零副本**——页面经 `/api/keys` 实时解析 `~/.config/niri/config.kdl` 的
-  binds 段，改键位本页自动跟随，不存在第二份键位表要维护；
-- **系统配色**——CSS 变量取自 Noctalia 色板 `~/.config/noctalia/colors.json`
-  （莫兰迪），换系统配色页面跟着换；色板文件缺失时降级到内置同值缺省色板。
+- **不是应用窗口**——第一版用过 chromium `--app` 开 canvas 页，被否（重、像启动了
+  个 app）；现改 layer-shell 覆盖层，`os/configs/hotkeys/shell.qml`（quickshell
+  独立小配置，安装 `scripts/install-hotkeys.sh`）；
+- **一行一条 + 超高滚动**（滚轮/PageUp/PageDown/方向键）；
+- **数据零副本**：启动时解析 `~/.config/niri/config.kdl` 的 binds 段（62 条全量，
+  含内联参数与滚轮键；`AGENTOS_NIRI_CONFIG` 可覆盖）；
+- **配色零副本**：读 `~/.config/noctalia/colors.json`（莫兰迪），缺省降级内置同值
+  （`AGENTOS_COLORS_JSON` 可覆盖）；
+- 实测坑（quickshell 0.3.2）：`FileView.text` 是**同步读方法**且需 `blockLoading:
+  true`；面板尺寸绑 `screen.width/height` 而非 `parent`（创建瞬间 contentItem 未
+  定型，负宽度直接不渲染）。
 
-实现：`packages/canvas` 的 keys 模块（`/api/keys` + `/keys`）。路径可用环境变量
-覆盖：`AGENTOS_NIRI_CONFIG`（键位数据源）、`AGENTOS_COLORS_JSON`（色板）。
-`Mod+Shift+/` 保留 niri 内置 overlay，作 canvas 服务不可用时的兜底。
+**agent 可呈现的网页版仍在**：canvas `/keys`（`packages/canvas`，过滤框/分组吸顶，
+供 desktop.open 给用户演示或在无桌面上下文查看）；`Mod+Shift+Slash` 保留 niri
+内置 overlay 作兜底。三层分工：浮层（人）→ 网页（agent 演示）→ 内置（兜底）。
 
-> 实测注记（2026-10-17，VM）：chromium 首次启动建 profile 时可能一次性弹两个
-> 相同窗口（首启现象），再按一次即单窗；日常使用无感。
 
 ## 3. Mac + VMware Fusion 用户注意事项
 

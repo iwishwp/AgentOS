@@ -28,6 +28,13 @@
 - **键位速查页**（`92f8f8d`）：Super+K → canvas `/keys`（可滚动+分组吸顶+过滤框；
   键位实时解析 niri 配置、配色实时读 colors.json，双零副本）；`Mod+Shift+Slash`
   保留 niri 内置兜底。
+- **键位速查浮层**（`c111027` 后续）：Super+K 弃用 chromium `--app`（"像启动了个 app"），
+  改 layer-shell 覆盖层 `qs -c agentos-hotkeys`（`os/configs/hotkeys/shell.qml`）——
+  Omarchy/niri 心智：居中面板+压暗背景+一行一条，Esc/点按关闭。数据/配色双零副本
+  （实时解析 niri 配置 62 条全量 + 读 Noctalia colors.json）。canvas `/keys` 网页版
+  保留为 agent 演示通道。两个 quickshell 0.3.2 实测坑入档：`FileView.text` 是同步
+  方法且需 `blockLoading: true`；面板尺寸必须绑 `screen` 而非 `parent`（创建瞬间
+  未定型 → 负宽度 → 不渲染）。
 - **默认终端 → Ghostty**（`ebcf33b`/`353180b`）：COPR `scottames/ghostty`（官方仓库无包），
   内置 `Catppuccin Frappe` 主题 + Noto CJK；**毛玻璃真相**：ghostty 自带 blur 只走
   KDE 协议、niri 只提供 ext-background-effect-v1，零重叠——真模糊由 niri 窗口规则

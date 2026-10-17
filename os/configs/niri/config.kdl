@@ -174,7 +174,7 @@ binds {
     // （keyring 锁定时网络栈挂死的教训）；Fedora 可执行名是 chromium-browser
     // （其他发行版可能叫 chromium，探测逻辑见 browser-mcp 的 detectChromiumBin）
     Mod+Shift+Slash { show-hotkey-overlay; }
-    Super+K hotkey-overlay-title="Keys: canvas /keys page" { spawn "chromium-browser" "--app=http://127.0.0.1:7788/keys" "--window-size=1000,800" "--password-store=basic" "--ozone-platform=wayland" "--no-first-run" "--no-default-browser-check"; }
+    Super+K hotkey-overlay-title="Keys: 键位速查浮层" { spawn "qs" "-c" "agentos-hotkeys"; }
 
     // 快捷键抑制逃生门（niri 默认）：远程桌面类应用可请求合成器停用快捷键，
     // 此键反制，避免被恶意/异常应用"劫持键盘"（allow-inhibiting=false 保证永远生效）

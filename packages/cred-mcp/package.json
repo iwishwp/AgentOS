@@ -17,6 +17,7 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@agentos/browser-mcp": "*",
     "@agentos/policy": "*",
     "@agentos/proc": "*",
     "@modelcontextprotocol/sdk": "^1.32.1",

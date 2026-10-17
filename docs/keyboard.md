@@ -105,7 +105,7 @@ Fusion 里 ⌘ 会被当作 Super 发进虚拟机，但 **macOS 自己先截获�
 | **Omarchy Super+T（平铺/浮动切换）、Super+C/V/X（通用剪贴板）、scratchpad/分组/尺寸微调等** | 均未采纳——不在 AgentOS 当前功能集（agent 优先，窗口操作走 niri-mcp） |
 | **binds 段整体替换语义** | niri 的 binds 段写出来就**替换全部默认键位**（不合并）。模板因此自带完整键位表，并垫底保留了方向键焦点移动；要更多默认键位从 niri 官方 default-config.kdl 拷 |
 | **锁屏依赖 swaylock** | 模板只绑键位；swaylock 未装时按键无效。安装命令见 §2 表尾注 |
-| **语法验证状态** | macOS 上无法运行 niri；KDL 语法已逐动作对照官方默认配置与 wiki（记录见调研文档 §3），**待真机 `niri validate` 验证后转正** |
+| **语法验证状态** | 2026-10-17 已在真机 niri 26.04（FC44 aarch64 VM）原样 `niri validate` 通过（含 aesthetics.kdl include 与 ghostty 毛玻璃规则；终端键位实测 spawn ghostty 正常开窗） |
 
 ## 5. 变更历史
 

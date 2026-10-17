@@ -9,7 +9,8 @@
 // wiki 键位文档（https://niri-wm.github.io/niri/Configuration:-Key-Bindings），
 // 动作名逐个核对过拼写（2026-10，niri 26.04 为 VM 实测版本）。
 //
-// ⚠️ 尚未在真机运行 `niri validate`，待验证（见 docs/keyboard.md「已知冲突与取舍」）。
+// ✅ 2026-10-17 已在真机 niri 26.04（FC44 aarch64 VM）原样 `niri validate` 通过
+//（含本文件 include 的 aesthetics.kdl；ghostty 毛玻璃 window-rule 同批验证）。
 //
 // ⚠️ 重要语义：binds 段一旦出现，niri 内置的完整默认键位即被整体替换
 // （不与默认值合并——wiki 明确提醒过）。因此本文件就是完整键位表；

@@ -122,8 +122,9 @@ describe("解析器 parseNiriBinds", () => {
     // 终端默认已切 ghostty（docs/ghostty.md），断言跟着真实配置走
     expect(all.find((b) => b.keys === "Mod+T")).toMatchObject({ title: "Terminal: ghostty" });
     const superK = all.find((b) => b.keys === "Super+K");
-    expect(superK!.action).toContain("--app=http://127.0.0.1:7788/keys");
-    expect(superK!.action).toContain("--password-store=basic");
+    // Super+K 已切 layer-shell 浮层（docs/keyboard.md §2.1）；canvas /keys 仍是 agent 演示页
+    expect(superK!.action).toContain('"qs"');
+    expect(superK!.action).toContain('"agentos-hotkeys"');
     // 内置兜底仍在
     expect(all.find((b) => b.keys === "Mod+Shift+Slash")!.action).toBe("show-hotkey-overlay");
   });

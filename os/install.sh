@@ -40,15 +40,25 @@ if [[ $SKIP_PACKAGES -eq 1 ]]; then
   echo "== 跳过系统包安装（--skip-packages）=="
 elif command -v pacman >/dev/null 2>&1; then
   echo "== 安装系统包（pacman）=="
+  # ghostty 在 Arch 官方 extra 仓库（与 alacritty 并存：后者保留为回退终端）
   sudo pacman -Sy --needed niri xwayland-satellite \
     xdg-desktop-portal-gnome xdg-desktop-portal-gtk \
-    alacritty fuzzel wl-clipboard libnotify mako \
+    ghostty alacritty fuzzel wl-clipboard libnotify mako \
     libreoffice-fresh \
     nodejs npm git
 elif command -v dnf >/dev/null 2>&1; then
   echo "== 安装系统包（dnf）=="
+  # alacritty 保留为回退终端（bootc 镜像线仍用它，见 os/bootc/）
   sudo dnf install -y niri xdg-desktop-portal-gnome xdg-desktop-portal-gtk \
     alacritty fuzzel wl-clipboard libnotify mako libreoffice-writer nodejs npm git
+  # ghostty 不在 Fedora 官方仓库（截至 2026-10 官方打包仍未落地），
+  # 走 COPR（scottames/ghostty 提供 fc44 aarch64/x86_64，自带依赖 gtk4-layer-shell；
+  # 论证与替代源对比见 docs/ghostty.md）。默认终端切换的实证版本为 1.3.1。
+  if ! command -v ghostty >/dev/null 2>&1; then
+    sudo dnf install -y dnf-plugins-core
+    sudo dnf copr enable -y scottames/ghostty
+    sudo dnf install -y ghostty
+  fi
   echo "提示: xwayland-satellite 不在 Fedora 官方仓库，如需 X11 应用支持："
   echo "  sudo dnf copr enable avengemedia/dms && sudo dnf install xwayland-satellite"
 else

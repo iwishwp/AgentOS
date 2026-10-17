@@ -9,7 +9,8 @@
 // wiki 键位文档（https://niri-wm.github.io/niri/Configuration:-Key-Bindings），
 // 动作名逐个核对过拼写（2026-10，niri 26.04 为 VM 实测版本）。
 //
-// ⚠️ 尚未在真机运行 `niri validate`，待验证（见 docs/keyboard.md「已知冲突与取舍」）。
+// ✅ 2026-10-17 已在真机 niri 26.04（FC44 aarch64 VM）原样 `niri validate` 通过
+//（含本文件 include 的 aesthetics.kdl；ghostty 毛玻璃 window-rule 同批验证）。
 //
 // ⚠️ 重要语义：binds 段一旦出现，niri 内置的完整默认键位即被整体替换
 // （不与默认值合并——wiki 明确提醒过）。因此本文件就是完整键位表；
@@ -37,13 +38,14 @@ screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
 binds {
     // ============ 启动应用 ============
 
-    // 终端（alacritty）：Omarchy 的 Super+Return 原样采纳
-    Super+Return { spawn "alacritty"; }
+    // 终端（ghostty）：Omarchy 的 Super+Return 原样采纳，实现换为 ghostty
+    //（默认终端切换调研见 docs/ghostty.md；alacritty 保留为回退，bootc 镜像线仍用它）
+    Super+Return { spawn "ghostty"; }
 
     // 终端别名：niri 默认 Mod+T 保留（现有文档与肌肉记忆沿用）。
     // 不用 Super+T 开终端：Omarchy 里 Super+T 是"平铺/浮动切换"而非终端，
     // 且 Mac 用户 ⌘T=新标签页的肌肉记忆容易误开一串终端——详见 docs/keyboard.md
-    Mod+T hotkey-overlay-title="Terminal: alacritty" { spawn "alacritty"; }
+    Mod+T hotkey-overlay-title="Terminal: ghostty" { spawn "ghostty"; }
 
     // 启动器（fuzzel）：Omarchy 的 Super+Space（Omarchy menu）键位原样采纳，
     // 菜单实现换成我们实际用的 fuzzel
@@ -189,4 +191,25 @@ binds {
     Mod+Ctrl+Down  { move-window-down; }
     Mod+Ctrl+Up    { move-window-up; }
     Mod+Ctrl+Right { move-column-right; }
+}
+
+// ============ 终端毛玻璃（ghostty + Catppuccin Frappé 配套） ============
+//
+// ghostty 1.3.x 在 Linux 上的 background-blur 只走 KDE 私有协议
+// （org_kde_kwin_blur_manager），niri 不实现它 → ghostty 自带模糊在 niri 下无效
+// （真机 A/B 实证见 docs/ghostty.md）。niri 26.04 起提供组合器侧窗口规则
+// background-effect，对任意半透明窗口强制模糊，与客户端是否请求无关——
+// 毛玻璃由这里 + ghostty 的 background-opacity = 0.85 共同达成。
+//
+// 语义注意（niri Window Effects 文档）：
+//  * 窗口必须半透明才能看到效果（ghostty 侧 background-opacity 负责）；
+//  * 规则式模糊跟随窗口的 geometry-corner-radius（本仓库 aesthetics.kdl 未设，
+//    即默认直角；若将来设圆角，模糊区域自动跟随）；
+//  * 非 xray 模糊（模糊下方真实内容）目前为 experimental——VM 26.04 实测正常，
+//    niri 升级若异常，删掉本块即可退回纯半透明。
+window-rule {
+    match app-id="^com.mitchellh.ghostty$"
+    background-effect {
+        blur true
+    }
 }

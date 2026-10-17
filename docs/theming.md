@@ -36,7 +36,7 @@
 | Noctalia 桌面壳（壁纸/取色/通知/bar） | P1 实装：niri 的 `background-color "transparent"` 已为它留位 | ⬜ 下一步 |
 | morandi-gen.py 动态色板生成器 | P2 重写：从 Noctalia colors.json 生成 niri 色板（去 KDE/fastfetch 等我们暂无的组件） | ⬜ |
 | 壁纸 | 不搬运；用户自放（Material You 自动取色） | — |
-| fish/starship/ghostty/kando/btop/cava/fastfetch | 与 AgentOS 核心体验无关，暂不纳入（终端保持 alacritty） | — |
+| fish/kando/btop/cava/fastfetch | 与 AgentOS 核心体验无关，暂不纳入（终端已切换为 ghostty：内置 Catppuccin Frappé + niri 侧毛玻璃，见 docs/ghostty.md；其配置随 os/configs/ghostty/ 分发） | — |
 | REAPER/Blender 等个人应用配置 | 不相关 | — |
 
 ## 4. 依赖与安装来源（Fedora/dnf）

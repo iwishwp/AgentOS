@@ -31,6 +31,8 @@ macOS（Apple Silicon）上的虚拟机**只能运行 aarch64 客户机**（跑 
 # 系统包：niri 官方仓库 + 通知/剪贴板/终端/启动器
 sudo dnf install niri xdg-desktop-portal-gnome xdg-desktop-portal-gtk \
   alacritty fuzzel wl-clipboard libnotify mako nodejs npm git
+# 默认终端 ghostty 不在 Fedora 官方仓库，走 COPR（实证见 docs/ghostty.md）：
+sudo dnf copr enable -y scottames/ghostty && sudo dnf install -y ghostty
 
 # X11 兼容层（COPR，可选——不测 X11 应用可以跳过）
 sudo dnf copr enable avengemedia/dms && sudo dnf install xwayland-satellite
@@ -156,7 +158,7 @@ Host agentos-vm
 # wl-clipboard=wl-copy/wl-paste  libnotify=notify-send  mako=通知守护进程
 sudo pacman -Syu niri xwayland-satellite \
   xdg-desktop-portal-gnome xdg-desktop-portal-gtk \
-  alacritty fuzzel wl-clipboard libnotify mako
+  ghostty alacritty fuzzel wl-clipboard libnotify mako
 
 # 开发依赖
 sudo pacman -S nodejs npm git
@@ -172,7 +174,7 @@ node --version   # 确认 ≥ 20（Arch 源里的 nodejs 远超此版本）
 启动会话：注销 → TTY 登录 → 运行 `niri-session`（systemd 系统；其他 init 用 `niri --session`）。
 若用登录管理器（greetd/SDDM/GDM），选择 Niri 会话即可。
 
-会话内基础键位（官方默认）：`Mod+T` 打开终端（alacritty）、`Mod+D` 启动器（fuzzel）、`Mod+Shift+E` 退出 niri。
+会话内基础键位（官方默认）：`Mod+T` 打开终端（默认终端为 ghostty，alacritty 保留为回退，见 docs/ghostty.md）、`Mod+D` 启动器（fuzzel）、`Mod+Shift+E` 退出 niri。
 
 > 安全提示（官方文档警告）：从 TTY 直接启动时，niri 退出/崩溃会落在**未锁定的 shell**，正式使用建议配登录管理器。
 
@@ -206,7 +208,7 @@ niri msg --json workspaces             # idx/is_active/output_id...
 niri msg --json outputs                # 名称/分辨率/逻辑位置...
 
 # 动作类（对照 niri-mcp 的封装）：
-niri msg action spawn -- alacritty     # 开一个新终端窗口
+niri msg action spawn -- ghostty       # 开一个新终端窗口（回退：alacritty）
 niri msg --json windows                # 找到新窗口的 id，下面用 <ID> 代替
 niri msg action move-window-to-workspace --id <ID> 2   # 移到工作区 2（不应抢走你的焦点）
 niri msg action focus-window --id <ID>                # 前台聚焦

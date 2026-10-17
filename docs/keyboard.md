@@ -24,7 +24,7 @@ niri 配置里的 `Super`（及 `Mod`，在 TTY 会话中 Mod 即 Super）物理
 
 | 功能 | 键位 | niri 动作 | Omarchy 出处 |
 |---|---|---|---|
-| 终端（alacritty） | `Super+Return` | spawn alacritty | ✅ Super+Return（Terminal） |
+| 终端（ghostty） | `Super+Return` | spawn ghostty | ✅ Super+Return（Terminal）；默认终端自 alacritty 切换为 ghostty（调研见 [ghostty.md](ghostty.md)），alacritty 保留为回退 |
 | 终端（别名） | `Mod+T`（Mac：⌘T） | 同上 | ➖ niri 默认；Omarchy 中 Super+T 另有他用（见 §4） |
 | 启动器（fuzzel） | `Super+Space` | spawn fuzzel | 🔧 Super+Space（Omarchy menu → fuzzel） |
 | 启动器（别名） | `Mod+D` | 同上 | ➖ niri 默认 |
@@ -128,7 +128,7 @@ Fusion 里 ⌘ 会被当作 Super 发进虚拟机，但 **macOS 自己先截获�
 | **键位速查：页面还是内置浮层？** | `Super+K` → canvas 页面（可滚动/可过滤/系统配色，Omarchy 心智）；`Mod+Shift+/` → niri 内置 overlay 兜底（canvas 服务挂了也有速查可用）。两层分工见 §2.1 |
 | **binds 段整体替换语义** | niri 的 binds 段写出来就**替换全部默认键位**（不合并）。模板因此自带完整键位表，并垫底保留了方向键焦点移动；要更多默认键位从 niri 官方 default-config.kdl 拷 |
 | **锁屏依赖 swaylock** | 模板只绑键位；swaylock 未装时按键无效。安装命令见 §2 表尾注 |
-| **语法验证状态** | macOS 上无法运行 niri；KDL 语法已逐动作对照官方默认配置与 wiki（记录见调研文档 §3），**待真机 `niri validate` 验证后转正** |
+| **语法验证状态** | 2026-10-17 已在真机 niri 26.04（FC44 aarch64 VM）原样 `niri validate` 通过（含 aesthetics.kdl include 与 ghostty 毛玻璃规则；终端键位实测 spawn ghostty 正常开窗） |
 
 ## 5. 变更历史
 

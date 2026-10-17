@@ -119,7 +119,8 @@ describe("解析器 parseNiriBinds", () => {
     const sections = readKeys(repoConfig);
     expect(sections.length).toBeGreaterThanOrEqual(4);
     const all = sections.flatMap((s) => s.binds);
-    expect(all.find((b) => b.keys === "Mod+T")).toMatchObject({ title: "Terminal: alacritty" });
+    // 终端默认已切 ghostty（docs/ghostty.md），断言跟着真实配置走
+    expect(all.find((b) => b.keys === "Mod+T")).toMatchObject({ title: "Terminal: ghostty" });
     const superK = all.find((b) => b.keys === "Super+K");
     expect(superK!.action).toContain("--app=http://127.0.0.1:7788/keys");
     expect(superK!.action).toContain("--password-store=basic");

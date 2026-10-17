@@ -75,20 +75,27 @@ done
 command -v podman >/dev/null 2>&1 || { echo "错误: 未安装 podman"; exit 1; }
 
 # 1) 预拉基础镜像（网络对 quay.io 的可达性提前暴露；停滞超时 → 重试，见顶部说明）
-echo "== podman pull ${BASE_IMAGE}（最多 ${PULL_ATTEMPTS} 次，单次上限 ${PULL_TIMEOUT}s）=="
-pulled=0
-for i in $(seq 1 "$PULL_ATTEMPTS"); do
-    if timeout "$PULL_TIMEOUT" podman pull --retry 3 "$BASE_IMAGE"; then
-        pulled=1; break
+#    本地 store 已有该 tag 时跳过：oci-archive 灌入的镜像没有 registry digest
+#    标注，podman pull 不认本地缓存会把整镜像重拉一遍（在本项目 VM 上必然
+#    撞 quay 停滞）；podman build 本身会用本地 tag。要强制刷新基座先 rmi 它。
+if podman image exists "$BASE_IMAGE" 2>/dev/null; then
+    echo "== 本地已有 ${BASE_IMAGE}，跳过预拉（刷新请先 podman rmi）=="
+else
+    echo "== podman pull ${BASE_IMAGE}（最多 ${PULL_ATTEMPTS} 次，单次上限 ${PULL_TIMEOUT}s）=="
+    pulled=0
+    for i in $(seq 1 "$PULL_ATTEMPTS"); do
+        if timeout "$PULL_TIMEOUT" podman pull --retry 3 "$BASE_IMAGE"; then
+            pulled=1; break
+        fi
+        echo "pull 第 ${i} 次失败（错误或 ${PULL_TIMEOUT}s 停滞超时）$([[ $i -lt $PULL_ATTEMPTS ]] && echo '，15s 后重试（已完成 blob 有缓存）')"
+        [[ $i -lt $PULL_ATTEMPTS ]] && sleep 15
+    done
+    if [[ $pulled -ne 1 ]]; then
+        echo "错误: ${BASE_IMAGE} 拉取失败（已尝试 ${PULL_ATTEMPTS} 次）。"
+        echo "      本 VM 到 quay.io 网络被阻断——按纪律停止构建，不设代理。"
+        echo "      构建验证转交 CI / x86_64 环境（docs/m5-atomic.md §CI）。"
+        exit 2
     fi
-    echo "pull 第 ${i} 次失败（错误或 ${PULL_TIMEOUT}s 停滞超时）$([[ $i -lt $PULL_ATTEMPTS ]] && echo '，15s 后重试（已完成 blob 有缓存）')"
-    [[ $i -lt $PULL_ATTEMPTS ]] && sleep 15
-done
-if [[ $pulled -ne 1 ]]; then
-    echo "错误: ${BASE_IMAGE} 拉取失败（已尝试 ${PULL_ATTEMPTS} 次）。"
-    echo "      本 VM 到 quay.io 网络被阻断——按纪律停止构建，不设代理。"
-    echo "      构建验证转交 CI / x86_64 环境（docs/m5-atomic.md §CI）。"
-    exit 2
 fi
 
 # 2) 构建（层说明见 os/bootc/Containerfile；内存紧张时 AGENTOS_BUILD_JOBS=1）

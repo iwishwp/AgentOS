@@ -99,10 +99,13 @@ else
 fi
 
 # 2) 构建（层说明见 os/bootc/Containerfile；内存紧张时 AGENTOS_BUILD_JOBS=1）
+#    --pull=never：基座获取是上面预拉步骤的职责，构建期一律用本地 tag——
+#    oci-archive 灌入的镜像缺 digest 标注时，默认的 --pull=missing 会被误判
+#    「本地缺失」而重撞 registry（本项目 VM 上即 quay 停滞）。
 echo "== podman build → ${IMAGE_TAG} =="
 JOBS_FLAG=()
 [[ -n "${AGENTOS_BUILD_JOBS:-}" ]] && JOBS_FLAG=(--jobs "${AGENTOS_BUILD_JOBS}")
-podman build "${JOBS_FLAG[@]}" "${EXTRA_FLAGS[@]}" \
+podman build --pull=never "${JOBS_FLAG[@]}" "${EXTRA_FLAGS[@]}" \
     -f os/bootc/Containerfile \
     -t "$IMAGE_TAG" \
     --build-arg "FEDORA_VERSION=${FEDORA_VERSION}" \

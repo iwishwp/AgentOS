@@ -1,0 +1,22 @@
+// AgentOS polkit 规则（permissions.md §4.2）。
+// 部署：sudo install -D -m 0644 49-agentos.rules /etc/polkit-1/rules.d/49-agentos.rules
+//
+// pkexec 的授权 action 是 org.freedesktop.policykit.exec：白名单里的 AgentOS helper
+// 被改写为 auth_admin（输密码，不记住——每次都问）；其余 pkexec 程序一律拒绝
+// （本机默认无其他 pkexec 使用方；若将来有需要，在此加白）。
+//
+// 不要求 subject.local/active：生产路径里 goose（systemd user service / 无 logind 会话，
+// 或远程 SSH 驱动）调用时 local/active 可能为 false，但 auth_admin 本身仍需 admin 密码——
+// 认证强度不降级，只是允许这些调用方走强认证（实测教训，见 permissions.md §4.2 修订）。
+// 真正的防线是：helper 路径白名单 + 包名校验 + 装前快照。
+polkit.addRule(function (action, subject) {
+  if (action.id == "org.freedesktop.policykit.exec") {
+    var program = action.lookup("program");
+    if (program == "/usr/libexec/agentos/pkg-install") {
+      return polkit.Result.AUTH_ADMIN;
+    }
+    if (program !== undefined) {
+      return polkit.Result.NO;
+    }
+  }
+});

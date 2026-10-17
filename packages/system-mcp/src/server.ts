@@ -2,8 +2,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { CommandRunner } from "@agentos/proc";
 import { ShellRunner } from "@agentos/proc";
-import { Policy, audit } from "@agentos/policy";
-import { SystemClient, SystemError, type PackageManager } from "./system.js";
+import { Policy, ConfirmClient, audit, createGate, summarizeArgs } from "@agentos/policy";
+import { SystemClient, SystemError, PackageInstaller, type PackageManager } from "./system.js";
 
 type ToolOk = { content: [{ type: "text"; text: string }] };
 type ToolResult = ToolOk | { content: [{ type: "text"; text: string }]; isError: true };
@@ -32,21 +32,28 @@ export function buildServer(
 ): McpServer {
   const server = new McpServer({ name: "system-mcp", version: "0.1.0" });
   const system = new SystemClient(runner);
+  const installer = new PackageInstaller(runner);
 
-  // 统一注册入口：先过策略（allow/deny + 审计），再进 handler
+  // 统一注册入口：先过策略（allow/deny/confirm + 审计），再进 handler。
+  // package_install 是 T2 工具：confirm 决策的强确认由 pkexec/polkit 承担（§4.2），
+  // 网关层不再额外弹 Confirm1——polkit 认证窗本身就是"确认后执行"。
   const EXT = "system";
-  const t = ((name: string, config: Parameters<McpServer["registerTool"]>[1], cb: any) =>
-    server.registerTool(name, config, async (args: unknown) => {
-      const verdict = policy.decide(EXT, name);
-      audit({ ts: new Date().toISOString(), extension: EXT, tool: name, decision: verdict.decision });
-      if (verdict.decision === "deny") {
-        return {
-          content: [{ type: "text" as const, text: `策略拒绝 ${EXT}.${name}（${verdict.reason}）。可在 ~/.config/agentos/policy.yaml 调整。` }],
-          isError: true,
-        };
-      }
-      return cb(args);
-    })) as McpServer["registerTool"];
+  const t = createGate({
+    server,
+    extension: EXT,
+    policy,
+    confirm: new ConfirmClient(),
+    tier: "t2",
+    delegatedConfirm: (tool) => tool === "package_install",
+    summary: (tool, args) =>
+      tool === "package_install"
+        ? `dnf install ${(args as { packages?: string[] }).packages?.join(" ") ?? "?"}`
+        : summarizeArgs(args),
+    detail: (tool, args) =>
+      tool === "package_install"
+        ? `packages=${(args as { packages?: string[] }).packages?.join(",") ?? ""}`
+        : summarizeArgs(args),
+  }) as McpServer["registerTool"];
 
   t(
     "system_status",
@@ -132,6 +139,50 @@ export function buildServer(
       description: "列出网络接口与 IP（ip -br addr，只读）。",
     },
     async () => guard(async () => text(await system.network())),
+  );
+
+  t(
+    "package_install",
+    {
+      title: "安装软件包（T2 强确认）",
+      description:
+        "安装系统软件包。流程：root 侧 helper 先创建只读快照（agentos-pre-dnf-*）再 dnf install -y，" +
+        "全程经 pkexec 触发 polkit 密码确认（屏幕会弹出系统认证窗，需要用户在场输入密码）。" +
+        "审计会记录快照编号；失败时按回复里的指引可回滚。装之前可先用 package_info 查包。",
+      inputSchema: {
+        packages: z
+          .array(z.string().min(1))
+          .min(1)
+          .max(10)
+          .describe("要安装的包名（仅包名，不带选项）"),
+      },
+    },
+    async ({ packages }) =>
+      guard(async () => {
+        const r = await installer.install(packages);
+        // 结果条目（决策条目由网关写）：快照号 + 退出码，回放时间轴可见
+        audit({
+          ts: new Date().toISOString(),
+          extension: EXT,
+          tool: "package_install",
+          decision: r.code === 0 ? "allow" : "deny",
+          detail: `result exit=${r.code} pkexec-helper`,
+          snapshot: r.snapshot,
+        });
+        const tail = (s: string) => s.split("\n").slice(-15).join("\n");
+        if (r.code !== 0) {
+          throw new SystemError(
+            `安装失败（exit ${r.code}）。${r.snapshot ? `已留兜底快照 #${r.snapshot}；` : ""}` +
+              `如装到一半需恢复: ~/AgentOS/scripts/snapshot.sh rollback ${r.snapshot ?? "N"}\n` +
+              `--- stderr（末 15 行）---\n${tail(r.stderr)}\n--- stdout（末 15 行）---\n${tail(r.stdout)}`,
+          );
+        }
+        return text(
+          `已安装: ${packages.join(" ")}（兜底快照 #${r.snapshot ?? "?"}）\n` +
+            `回滚指引（如需）: ~/AgentOS/scripts/snapshot.sh rollback ${r.snapshot ?? "N"}\n` +
+            `--- dnf 输出（末 15 行）---\n${tail(r.stdout)}`,
+        );
+      }),
   );
 
   return server;

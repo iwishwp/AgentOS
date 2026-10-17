@@ -1,0 +1,38 @@
+# AgentOS 默认终端 ghostty 配置
+# 部署到 ~/.config/ghostty/config；调研与真机实证记录见 docs/ghostty.md
+# 实测环境：ghostty 1.3.1（Fedora 44 aarch64，COPR scottames/ghostty）+ niri 26.04
+
+# —— 主题：Catppuccin Frappé ——
+# 注意：内置主题名带空格（对应 /usr/share/ghostty/themes/Catppuccin Frappe），
+# 写成 catppuccin-frappe 会报 "theme not found" 并弹配置错误窗（实测踩过）
+theme = Catppuccin Frappe
+
+# —— 字体：Noto Sans Mono CJK SC ——
+# fedora 包 google-noto-sans-mono-cjk-vf-fonts；中英混排等宽对齐、
+# 无豆腐块（VM 实测：粗体/斜体亦正确解析为同族变体）
+font-family = Noto Sans Mono CJK SC
+font-size = 12
+
+# —— 毛玻璃 = 半透明（这里）+ 模糊（niri 窗口规则，见下）——
+# background-opacity 由 ghostty 自身渲染，任何合成器下都有效；
+# background-blur 在 Linux 上 ghostty 只走 KDE 协议（org_kde_kwin_blur_manager），
+# niri 未实现该协议 → 此键在 niri 下静默无效（真机 A/B 实证，见 docs/ghostty.md）。
+# 真正的模糊由 niri 26.04 窗口规则 background-effect { blur true } 在组合器侧
+# 提供（os/configs/niri/config.kdl 末尾的 window-rule）。
+# 此键保留 true：一是不无害（niri 下静默忽略），二是未来在 KDE 上运行同配置、
+# 或上游落地 ext-background-effect-v1（ghostty discussions #13378）后直接生效。
+background-opacity = 0.85
+background-blur = true
+
+# —— 窗口行为（agent 场景）——
+# 关窗不弹确认：agent 批量开关终端，确认框只会挡自动化
+confirm-close-surface = false
+# 每次启动独立进程：保证 `ghostty -e cmd` 行为可预期
+# （noctalia appLauncher / desktop-mcp 等外部拉起场景依赖）
+gtk-single-instance = false
+# 无标题栏：平铺 WM 里标题栏浪费一行；窗口标题由状态栏展示
+gtk-titlebar = false
+
+# —— 内边距：缓解文字贴窗口边（与 niri 窗口间距互补）——
+window-padding-x = 10
+window-padding-y = 10

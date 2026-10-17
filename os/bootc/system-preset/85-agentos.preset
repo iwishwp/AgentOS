@@ -1,0 +1,12 @@
+# AgentOS 系统单元 preset（随镜像走）
+#
+# 为什么需要这个文件（2026-10-17 部署验证发现的坑）：
+#   bootc 磁盘部署（bootc-image-builder / bootc install）会对【系统单元】
+#   重放 systemd preset——F44 的 99-default-disable.preset 默认禁用一切
+#   未声明单元。构建期 `systemctl enable greenboot-healthcheck.service`
+#   写进容器 /etc 的 wants 符号链接在部署盘上被抹掉（实测：multi-user
+#   .target.wants 无 greenboot；sddm 存活纯靠 Fedora 自带的
+#   85-display-manager.preset）。user 单元不受影响（--global enable 的
+#   /etc/systemd/user/ 符号链接实测完好到达部署盘）。
+#   修法即本文件：preset 显式 enable（Bazzite 的 00-bazzite.preset 同模式）。
+enable greenboot-healthcheck.service

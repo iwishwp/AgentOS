@@ -155,6 +155,10 @@ COPY os/bootc/firstboot/ /usr/share/agentos/bin/
 # greenboot 必需健康检查（随镜像版本走，放 /usr/lib 而非 /etc——后者是机器本地态；
 # greenboot 0.16.4 两处都会扫，rpm -ql 实测）。脚本必须可执行（greenboot 直接 run）。
 COPY os/bootc/greenboot/check/ /usr/lib/greenboot/check/
+# 系统单元 preset：部署期（bootc/bib）会对系统单元重放 preset，F44 默认
+# disable-all——构建期 enable 的符号链接会被抹（实测，详见 preset 文件头注释）。
+# 随镜像声明 enable 才能在部署盘上存活（Bazzite 00-bazzite.preset 同模式）。
+COPY os/bootc/system-preset/85-agentos.preset /usr/lib/systemd/system-preset/
 RUN chmod 0755 /usr/share/agentos/bin/*.sh /usr/lib/greenboot/check/required.d/*.sh
 
 # user 单元（对每个登录用户生效）：

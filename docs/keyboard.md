@@ -24,7 +24,7 @@ niri 配置里的 `Super`（及 `Mod`，在 TTY 会话中 Mod 即 Super）物理
 
 | 功能 | 键位 | niri 动作 | Omarchy 出处 |
 |---|---|---|---|
-| 终端（alacritty） | `Super+Return` | spawn alacritty | ✅ Super+Return（Terminal） |
+| 终端（ghostty） | `Super+Return` | spawn ghostty | ✅ Super+Return（Terminal）；默认终端自 alacritty 切换为 ghostty（调研见 [ghostty.md](ghostty.md)），alacritty 保留为回退 |
 | 终端（别名） | `Mod+T`（Mac：⌘T） | 同上 | ➖ niri 默认；Omarchy 中 Super+T 另有他用（见 §4） |
 | 启动器（fuzzel） | `Super+Space` | spawn fuzzel | 🔧 Super+Space（Omarchy menu → fuzzel） |
 | 启动器（别名） | `Mod+D` | 同上 | ➖ niri 默认 |

@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { mkdtempSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { FakeRunner } from "@agentos/proc/testing";
 import {
@@ -50,7 +51,13 @@ describe("通道 A（cred_autofill）", () => {
     eval: async (js: string) => {
       // 记录表达式（不得包含明文），返回页面内计算的回执形态
       (cdp as { lastJs?: string }).lastJs = js;
-      return { value: { bytes: Buffer.byteLength(SECRET, "utf8"), sha256: "deadbeef" } };
+      return {
+        value: {
+          bytes: Buffer.byteLength(SECRET, "utf8"),
+          matches: true,
+          sha256: "deadbeef",
+        },
+      };
     },
   };
 
@@ -61,6 +68,25 @@ describe("通道 A（cred_autofill）", () => {
     expect(JSON.stringify(r)).not.toContain(SECRET);
     // 表达式里是 JSON.stringify 内嵌（无引号逃逸面）
     expect(cdp.lastJs).toContain(JSON.stringify(SECRET));
+  });
+
+  it("非安全上下文（无 subtle）：sha256 由 broker 端补算", async () => {
+    const localOnly = {
+      open: async () => "x",
+      eval: async () => ({ value: { bytes: Buffer.byteLength(SECRET, "utf8"), matches: true } }),
+    };
+    const r = await makeBroker().autofill("vault://test/full", "data:text/html,<input>", "#p", localOnly);
+    expect(r.sha256).toBe(createHash("sha256").update(SECRET).digest("hex"));
+  });
+
+  it("页面内值不一致（matches=false）被拒", async () => {
+    const bad = {
+      open: async () => "x",
+      eval: async () => ({ value: { bytes: 3, matches: false } }),
+    };
+    await expect(
+      makeBroker().autofill("vault://test/full", "data:text/html,<input>", "#p", bad),
+    ).rejects.toThrow(/不一致/);
   });
 
   it("未开放 autofill 通道被拒（不触碰 secret-tool）", async () => {

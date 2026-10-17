@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import type { CommandRunner, RunResult } from "@agentos/proc";
 import { parse } from "yaml";
 
@@ -171,11 +172,21 @@ export class CredBroker {
     try {
       await cdp.open(url);
       const js = buildFillExpression(selector, value);
-      const r = (await cdp.eval(js)) as { value?: { bytes?: number; sha256?: string; error?: string } };
-      if (!r?.value || typeof r.value.bytes !== "number" || !r.value.sha256) {
+      const r = (await cdp.eval(js)) as { value?: { bytes?: number; sha256?: string; matches?: boolean; error?: string } };
+      if (!r?.value || typeof r.value.bytes !== "number") {
         throw new CredError(`填充失败: ${r?.value?.error ?? "页面内执行无返回"}`);
       }
-      return { url, selector, bytes: r.value.bytes, sha256: r.value.sha256 };
+      if (r.value.matches === false) {
+        throw new CredError("填充校验失败：页面内值与凭据不一致（选择器命中了被框架改写的输入框？）");
+      }
+      return {
+        url,
+        selector,
+        bytes: r.value.bytes,
+        // 页面在安全上下文（https）时自己算 sha256；data: URL 等非安全上下文没有
+        // crypto.subtle，由 broker 端用同一明文补算——值不出 broker，语义等价
+        sha256: r.value.sha256 ?? createHash("sha256").update(value).digest("hex"),
+      };
     } finally {
       // 明文生命周期 = 本函数栈（JS 字符串不可变，无法"置零"——不把它传出本函数即边界；
       // 与通道 B 同款纪律：只回长度/哈希，值绝不进返回值、日志、审计）
@@ -232,12 +243,19 @@ export function buildFillExpression(selector: string, value: string): string {
     "value",
   ).set;
   setter.call(el, ${JSON.stringify(value)});
+  // 页面内逐字节确认（值不下行，只回布尔）——比哈希更强的"确实填进去了"
+  const matches = el.value === ${JSON.stringify(value)};
+  const bytes = new TextEncoder().encode(el.value).length;
   el.dispatchEvent(new Event("input", { bubbles: true }));
   el.dispatchEvent(new Event("change", { bubbles: true }));
-  return crypto.subtle.digest("SHA-256", new TextEncoder().encode(el.value)).then((buf) => ({
-    bytes: new TextEncoder().encode(el.value).length,
-    sha256: [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join(""),
-  }));
+  const out = { bytes, matches };
+  if (globalThis.crypto && globalThis.crypto.subtle) {
+    // 安全上下文（https/file）才有 subtle；data: URL 没有，由 broker 端补算
+    return globalThis.crypto.subtle
+      .digest("SHA-256", new TextEncoder().encode(el.value))
+      .then((buf) => ({ ...out, sha256: [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("") }));
+  }
+  return out;
 })()`;
 }
 

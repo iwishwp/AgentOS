@@ -189,3 +189,28 @@ COPR `errornointernet/quickshell` 有 fedora-44-aarch64 的 0.3.2 成功构建�
 升级方案：先 `snapper` 快照 → copr 升级 quickshell → 验证 v4.7.1+补丁集是否仍
 可启动（0.2→0.3 有破坏性变更风险）；不行则评估直升 Noctalia v5（settingsVersion
 我们已同源为 59）。升完即可撤补丁 0001/0004，毛玻璃与音频频谱一并回归。
+
+## 9. quickshell 0.3.2 升级与毛玻璃回归（2026-10-17，agentos-vm）
+
+用户拍板后执行，全链路一次打通：
+
+1. **快照**：`snapper -c root create --read-only -d agentos-pre-quickshell-0.3`（回滚点）；
+2. **升级**：`dnf copr enable errornointernet/quickshell && dnf update quickshell`
+   （0.2.1 → 0.3.2，fedora-44-aarch64 COPR 构建实测可用）；
+3. **模块核验**：`BackgroundEffect`（Wayland/_BackgroundEffect）与 `Quickshell.WindowManager`
+   已提供；`Quickshell.DWL`、`PwAudioSpectrum` 仍缺 → 补丁集变更为 **{0001, 0002, 0005}**
+   （撤 0003/0004，见 patches/README.md 双版本矩阵）；
+4. **API 适配（新补丁 0005）**：0.2→0.3 破坏性变更——`Region` 的角布尔属性
+   （`topLeftCorner` 等）改为每角半径整数（`topLeftRadius` 等），`CornerState`
+   枚举被删。noctalia v4.7.1 的 16 处用法映射为 `*Radius: state>=0 ? Style.radiusL : 0`；
+   `CornerState.Normal` → `-1`。未适配时 shell 直接加载失败
+   （`Cannot assign to non-existent property "bottomRightCorner"`）；
+5. **验证**：12s 加载自检 0 ERROR（仅无蓝牙 WARN）→ 常驻重启 →
+   `bar.backgroundOpacity` 临时降到 0.5 截图，视觉模型确认**栏后壁纸有真实
+   高斯模糊**（栏外花瓣/发丝锐利、栏内柔化）→ 恢复 0.93。
+   niri 侧零改动——26.04 的 `ext-background-effect-v1` 协议原生支持。
+
+**栏位**：用户明确要顶部横栏（LanRhyme 本人用左侧垂直栏），`bar.position=top`
+已固定进 `apply-lanrhyme-theme.sh`；毛玻璃对栏/面板/dock 同样生效。
+
+音频频谱仍静止（0001 保留，0.3.2 依旧无 PwAudioSpectrum，等上游）。

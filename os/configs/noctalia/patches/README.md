@@ -1,17 +1,30 @@
-# Noctalia v4.7.1 补丁集（适配 Fedora quickshell 0.2.1^git20260209）
+# Noctalia v4.7.1 补丁集（按 quickshell 版本二选一）
 
-针对上游 tag `v4.7.1`（legacy-v4 分支）的 4 个补丁，按编号顺序应用。
-上游仓库：<https://github.com/noctalia-dev/noctalia>（分支 `legacy-v4`）。
+针对上游 tag `v4.7.1`（legacy-v4 分支）。上游仓库：
+<https://github.com/noctalia-dev/noctalia>（分支 `legacy-v4`）。
+
+**补丁集随 quickshell 版本变化（2026-10-17 起 VM 走 quickshell 0.3.2）：**
+
+| quickshell 版本 | 应用补丁 | 安装方式 |
+|---|---|---|
+| 0.2.1（Fedora F44 官方包） | 0001 + 0002 + 0003 + 0004 | `install-noctalia.sh`（默认目录全量） |
+| **≥ 0.3（COPR errornointernet/quickshell，实测 0.3.2）** | **0001 + 0002 + 0005** | `install-noctalia.sh --patches <含 0001/0002/0005 的目录>` |
+
+差异原因：0.3.2 已提供 `Quickshell.WindowManager` 与 `BackgroundEffect`
+（撤 0003/0004，毛玻璃回归），但仍无 `Quickshell.DWL` 与 `PwAudioSpectrum`
+（留 0001/0002）；同时 0.2→0.3 把 `Region` 的角布尔属性（`topLeftCorner` 等）
+改成了每角半径整数（`topLeftRadius` 等）并删除 `CornerState` 枚举——0005 做等价
+映射（state≥0 视为圆角 Style.radiusL，-1 直角 0）。
 
 ## 应用方法
 
 ```bash
-# 在解压好的 noctalia v4.7.1 源码树根目录（含 shell.qml）：
+# 在解压好的 noctalia v4.7.1 源码树根目录（含 shell.qml），按编号顺序：
 git apply 0001-spectrum-PwAudioSpectrum-quickshell-0.2.1.patch
 git apply 0002-compositor-Mango-Quickshell.DWL.patch
-git apply 0003-compositor-Labwc-Quickshell.WindowManager.patch
-git apply 0004-ui-BackgroundEffect-blur-Region-0.2.1-API.patch
-# 或一把梭：for p in [0-9]*.patch; do git apply "$p"; done
+# quickshell ≥0.3 时接着：
+git apply 0005-region-corners-quickshell-0.3.patch
+# quickshell =0.2.1 时则是 0003/0004（毛玻璃牺牲）
 ```
 
 每个补丁都带 `AGENTOS-PATCH(noctalia-v4.7.1/NN)` 标记，`grep -rn AGENTOS-PATCH` 可定位全部改动点。
@@ -20,12 +33,13 @@ git apply 0004-ui-BackgroundEffect-blur-Region-0.2.1-API.patch
 
 | # | 文件 | 原因 | 影响 |
 |---|---|---|---|
-| 0001 | `Services/Media/SpectrumService.qml` | `PwAudioSpectrum` 类型在 quickshell 0.2.1 中不存在 | 音频频谱视觉化静止（values 恒空），其余功能不受影响 |
-| 0002 | `Services/Compositor/CompositorService.qml` | MangoService 依赖的 `Quickshell.DWL` 模块未随 Fedora 包编译 | 移除 MangoWC 合成器后端（惰性组件+检测分支）。AgentOS 只跑 niri，不影响 |
-| 0003 | `Services/Compositor/CompositorService.qml` | LabwcService 依赖的 `Quickshell.WindowManager` 模块未编译 | 移除 LabWC 后端，同上不影响 niri |
-| 0004 | `Modules/MainScreen/MainScreen.qml`、`Modules/Panels/Launcher/LauncherOverlayWindow.qml`、`Modules/Dock/Dock.qml` | `BackgroundEffect`（blur attached property）与 `Region` 的 `*Corner` 圆角属性在 0.2.1 中不存在 | bar/launcher/dock 无背景模糊（毛玻璃）效果，纯装饰性损失 |
+| 0001 | `Services/Media/SpectrumService.qml` | `PwAudioSpectrum` 类型缺失（0.2.1 与 0.3.2 均无） | 音频频谱视觉化静止（values 恒空），其余功能不受影响 |
+| 0002 | `Services/Compositor/CompositorService.qml` | MangoService 依赖的 `Quickshell.DWL` 模块未随 Fedora/COPR 包编译（两版皆缺） | 移除 MangoWC 合成器后端。AgentOS 只跑 niri，不影响 |
+| 0003 | `Services/Compositor/CompositorService.qml` | LabwcService 依赖 `Quickshell.WindowManager`（仅 0.2.1 缺） | 移除 LabWC 后端。**qs≥0.3 不应用** |
+| 0004 | `Modules/MainScreen/MainScreen.qml` 等 | `BackgroundEffect`/`Region.*Corner` 缺失（仅 0.2.1） | 无毛玻璃。**qs≥0.3 不应用（毛玻璃回归）** |
+| 0005 | `Modules/MainScreen/MainScreen.qml`、`Modules/Panels/Launcher/LauncherOverlayWindow.qml` | 0.2→0.3 API 变更：`Region` 角布尔 → 每角半径；`CornerState` 枚举被删 | 把 16 处角布尔映射为 `*Radius: state>=0 ? Style.radiusL : 0`；`CornerState.Normal` → `-1`。**仅 qs≥0.3 需要** |
 
 ## 回滚
 
-quickshell 升级到包含上述 API 的版本后（判据见 `docs/noctalia.md` 升级路径一节），
-直接换装更新 tag 的原版源码即可，无需逐补丁回滚。
+quickshell 降级/出问题时：VM 有 snapper 快照 `agentos-pre-quickshell-0.3`
+（2026-10-17，升级 0.3.2 前打的只读快照），可整体回滚。

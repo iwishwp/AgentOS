@@ -3,11 +3,13 @@
 # scripts/apply-lanrhyme-theme.sh —— LanRhyme 观感移植（Noctalia v4.7.1）
 #
 # 在已装 Noctalia（scripts/install-noctalia.sh）的 VM/真机上，把桌面观感对齐
-# github.com/LanRhyme/dotfiles 的截图：左侧垂直栏 + 莫兰迪配色 + 插画壁纸。
+# github.com/LanRhyme/dotfiles 的截图风格：莫兰迪配色 + 插画壁纸；栏位取顶部
+# 横栏（用户偏好，LanRhyme 本人用的左侧垂直栏）。
 #
 # 做四件事（幂等，可重复执行）：
-#   1. settings.json：bar.position=left、scaleRatio=0.9、托盘折叠、
-#      density/capsuleOpacity/Workspace 样式（与 LanRhyme settingsVersion 59 对齐）
+#   1. settings.json：bar.position=top（用户偏好顶部横栏）、scaleRatio=0.9、
+#      托盘折叠、density/capsuleOpacity/Workspace 样式（与 LanRhyme 对齐；
+#      时钟横排格式 formatHorizontal 默认已带）
 #   2. colors.json：写入 LanRhyme 莫兰迪色板（源色 #eee6ba，由 kita.png 生成）
 #      ——关键：必须同时把 colorSchemes.useWallpaperColors 置 true，
 #      否则启动时 ColorSchemeService 会套预设主题并【覆写】colors.json
@@ -49,7 +51,7 @@ import json, sys, os
 lan_dir = sys.argv[1]
 p = os.path.expanduser("~/.config/noctalia/settings.json")
 d = json.load(open(p))
-d["bar"]["position"] = "left"
+d["bar"]["position"] = "top"
 d["bar"]["density"] = "comfortable"
 d["bar"]["capsuleOpacity"] = 0.16
 d["general"]["scaleRatio"] = 0.9
@@ -66,11 +68,11 @@ lan_ws = {"characterCount": 2, "colorizeIcons": False, "emptyColor": "secondary"
           "showLabelsOnlyWhenOccupied": True, "unfocusedIconsOpacity": 1}
 w = d["bar"]["widgets"]
 w["center"] = [lan_ws if x.get("id") == "Workspace" else x for x in w["center"]]
-# 托盘折叠（垂直栏放不下平铺托盘）；VM 无电池，去掉 Battery
+# 托盘折叠（图标多时不溢出）；VM 无电池，去掉 Battery
 w["right"] = [lan_tray if x.get("id") == "Tray" else x
               for x in w["right"] if x.get("id") != "Battery"]
 json.dump(d, open(p, "w"), indent=2, ensure_ascii=False)
-print("settings.json: position=left density=comfortable useWallpaperColors=true")
+print("settings.json: position=top density=comfortable useWallpaperColors=true")
 PY
 
 cp "${LAN_DIR}/colors.json" "${NOCTALIA_DIR}/colors.json"

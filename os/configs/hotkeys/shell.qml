@@ -163,7 +163,7 @@ ShellRoot {
           // 尺寸绑 screen（创建瞬间 contentItem 可能未定型，绑 parent.width 会得负值）
           readonly property real panelWidth: (win.screen?.width ?? 1280) - 48
           readonly property real maxH: (win.screen?.height ?? 800) - 80
-          readonly property real contentH: Math.min(view.contentHeight + 96, maxH)
+          readonly property real contentH: Math.min(view.contentHeight + 108, maxH)
 
           width: panelWidth
           height: contentH
@@ -182,7 +182,7 @@ ShellRoot {
           Column {
             anchors.fill: parent
             anchors.margins: 24
-            spacing: 36
+            spacing: 44
 
             // 标题：小号、常规字重、灰（Omarchy "Keybindings" 的层级：弱于正文）
             Text {
@@ -192,12 +192,13 @@ ShellRoot {
               font.pixelSize: 11
               font.weight: Font.Normal
               font.family: "monospace"
+              height: 16
             }
 
             ListView {
               id: view
               width: parent.width
-              height: parent.height - 47
+              height: parent.height - 108
               clip: true
               interactive: true
               spacing: 8
@@ -245,11 +246,22 @@ ShellRoot {
                   }
 
                   Text {
+                    id: arrowText
                     anchors.left: parent.left
-                    anchors.leftMargin: Math.round(parent.width * 0.45)
+                    anchors.leftMargin: Math.round(parent.width * 0.5)
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: modelData.type === "b" ? "→" : ""
+                    color: root.colors.primary
+                    font.pixelSize: 17
+                    font.family: "monospace"
+                  }
+
+                  Text {
+                    anchors.left: arrowText.right
+                    anchors.leftMargin: 10
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    text: modelData.type === "b" ? "→  " + (modelData.title ?? "") : ""
+                    text: modelData.type === "b" ? (modelData.title ?? "") : ""
                     color: root.colors.on_surface
                     font.pixelSize: 17
                     font.family: "monospace"

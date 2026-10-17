@@ -8,6 +8,8 @@ import {
   readAudit,
 } from "./replay.js";
 import { replayPageHtml } from "./replay-page.js";
+import { DEFAULT_NIRI_CONFIG, readKeys } from "./keys.js";
+import { DEFAULT_COLORS_JSON, keysPageHtml, loadColors } from "./keys-page.js";
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -37,18 +39,22 @@ const MIME: Record<string, string> = {
  *   /api/recordings                                        会话录像清单
  *   /recordings/<name>                                     录像播放（Range 支持）
  *   /replay                                                回放页（时间轴 + 录像）
+ *   /api/keys                                              键位表 JSON（实时解析 niri config.kdl binds 段）
+ *   /keys                                                  键位速查页（Super+K 的落点，莫兰迪配色）
  * 只绑 127.0.0.1；所有文件路径经 realpath 越界检查（与 files-mcp 同款沙箱纪律）。
  * agent 的使用方式：files__write_file("canvas/<名字>/index.html", ...) 然后
  * desktop__open("http://127.0.0.1:7788/<名字>/")。
  */
 export function createCanvasServer(
   rootRaw: string,
-  opts: { auditPath?: string; recordingsDir?: string } = {},
+  opts: { auditPath?: string; recordingsDir?: string; niriConfigPath?: string; colorsPath?: string } = {},
 ): http.Server {
   fs.mkdirSync(rootRaw, { recursive: true });
   const root = fs.realpathSync(rootRaw);
   const auditPath = opts.auditPath ?? process.env["AGENTOS_AUDIT_PATH"] ?? DEFAULT_AUDIT_PATH;
   const recordingsDir = opts.recordingsDir ?? DEFAULT_RECORDINGS_DIR;
+  const niriConfigPath = opts.niriConfigPath ?? process.env["AGENTOS_NIRI_CONFIG"] ?? DEFAULT_NIRI_CONFIG;
+  const colorsPath = opts.colorsPath ?? process.env["AGENTOS_COLORS_JSON"] ?? DEFAULT_COLORS_JSON;
 
   const safe = (relUrl: string): string | null => {
     // URL 路径以 / 开头，path.resolve 会把它当绝对路径丢弃 root，必须先剥掉
@@ -103,6 +109,24 @@ export function createCanvasServer(
     }
     if (pathname.startsWith("/recordings/")) {
       serveRecording(pathname, req, res);
+      return;
+    }
+
+    // ---- 键位速查面（Super+K 的落点；数据实时解析 niri 配置，无手工副本） ----
+    if (pathname === "/api/keys") {
+      try {
+        const sections = readKeys(niriConfigPath);
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+        res.end(JSON.stringify(sections));
+      } catch (e) {
+        res.writeHead(500, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+        res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
+      }
+      return;
+    }
+    if (pathname === "/keys" || pathname === "/keys/") {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+      res.end(keysPageHtml(loadColors(colorsPath)));
       return;
     }
 

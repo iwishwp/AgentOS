@@ -18,6 +18,8 @@
    - office 文档（fodt/docx/odt 等）→ `desktop__open` 带 `app: libreoffice` 参数
      （系统 MIME 关联不可靠，实测 Fedora 把 fodt 识别成 text/xml）；
    - 网页内容 → 浏览器；
+   - 向用户展示/讲解键位 → `desktop__open` 打开 `http://127.0.0.1:7788/keys`
+     （键位速查页，与用户按 Super+K 看到的同一页，实时反映 niri 配置）；
 3. 任务完成、失败、或需要用户决策时，用 `desktop__notify` 发通知（标题一句话说清结论）。
 
 ## 浏览器操作（水族馆内）

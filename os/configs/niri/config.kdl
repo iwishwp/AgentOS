@@ -162,10 +162,17 @@ binds {
 
     // ============ 保留的 niri 默认（可用性垫底，非 Omarchy 借鉴） ============
 
-    // 快捷键速查浮层：niri 默认 Mod+Shift+Slash，另采纳 Omarchy 的
-    // Super+K"显示键位表"作为同义键（Omarchy 心智）
+    // 键位速查，两层分工（2026-10-17 起）：
+    //   Super+K → canvas 键位速查页 http://127.0.0.1:7788/keys（Omarchy 心智的
+    //     "可翻页键位表"）：系统莫兰迪配色（Noctalia colors.json）、整页上下滚动、
+    //     输入即过滤；数据实时解析本文件 binds 段，改键位页面自动跟随，无手工副本
+    //     （实现：packages/canvas 的 keys 模块）。
+    //   Mod+Shift+Slash → niri 内置 hotkey overlay 保留，作 canvas 服务不可用时的兜底。
+    // chromium 参数对齐 packages/browser-mcp 的实测结论：--password-store=basic 必须
+    // （keyring 锁定时网络栈挂死的教训）；Fedora 可执行名是 chromium-browser
+    // （其他发行版可能叫 chromium，探测逻辑见 browser-mcp 的 detectChromiumBin）
     Mod+Shift+Slash { show-hotkey-overlay; }
-    Super+K { show-hotkey-overlay; }
+    Super+K hotkey-overlay-title="Keys: canvas /keys page" { spawn "chromium-browser" "--app=http://127.0.0.1:7788/keys" "--window-size=1000,800" "--password-store=basic" "--ozone-platform=wayland" "--no-first-run" "--no-default-browser-check"; }
 
     // 快捷键抑制逃生门（niri 默认）：远程桌面类应用可请求合成器停用快捷键，
     // 此键反制，避免被恶意/异常应用"劫持键盘"（allow-inhibiting=false 保证永远生效）

@@ -72,7 +72,7 @@ niri 配置里的 `Super`（及 `Mod`，在 TTY 会话中 Mod 即 Super）物理
 ### 2.1 键位速查（Super+K：系统浮层 + agent 网页版）
 
 `Super+K` 弹出 **layer-shell 浮层**（`qs -c agentos-hotkeys`，Omarchy/niri 原生心智：
-居中面板、压暗背景、一行一条，Esc/点按即关，进程即起即退无常驻）：
+顶部居中（状态栏下方）、轻压暗背景、一行一条，Esc/点按即关，进程即起即退无常驻）：
 
 - **不是应用窗口**——第一版用过 chromium `--app` 开 canvas 页，被否（重、像启动了
   个 app）；现改 layer-shell 覆盖层，`os/configs/hotkeys/shell.qml`（quickshell

@@ -134,21 +134,24 @@ ShellRoot {
         focus: true
         Keys.onEscapePressed: Qt.quit()
 
-        // 压暗背景（overlay 质感；点按即关）
-        Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.35 }
+        // 轻压暗（Omarchy 式：壁纸原色可见，只稍微聚焦；点按即关）
+        Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.15 }
         MouseArea { anchors.fill: parent; onClicked: Qt.quit() }
 
         // ---- 居中面板（Omarchy/niri 心智：一行一条，超高滚动） ----
         Rectangle {
           id: panel
           // 尺寸绑 screen（创建瞬间 contentItem 可能未定型，绑 parent.width 会得负值）
-          readonly property real panelWidth: Math.min(640, (win.screen?.width ?? 1280) - 80)
+          readonly property real panelWidth: Math.min(720, (win.screen?.width ?? 1280) - 80)
           readonly property real maxH: (win.screen?.height ?? 800) - 100
           readonly property real contentH: Math.min(view.contentHeight + 56, maxH)
 
           width: panelWidth
           height: contentH
-          anchors.centerIn: parent
+          // Omarchy 心智：顶部居中（状态栏下方），非屏幕正中
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.top: parent.top
+          anchors.topMargin: 56
           radius: 16
           color: root.colors.surface_container
           border.width: 1
@@ -191,7 +194,7 @@ ShellRoot {
               delegate: Item {
                 required property var modelData
                 width: view.width
-                height: modelData.type === "h" ? 30 : 26
+                height: modelData.type === "h" ? 26 : 24
 
                 Text {
                   visible: modelData.type === "h"

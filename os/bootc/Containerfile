@@ -86,7 +86,8 @@ RUN dnf -y install \
         # niri.desktop 由 niri 包自带，SDDM 会话列表直接可选（F44 实测包名）
         sddm sddm-wayland-generic accountsservice \
         # --- 桌面基础设施（基座缺项）：音频栈 / GL / 标准用户目录 ---
-        pipewire-audio mesa-dri-drivers xdg-user-dirs \
+        # F44 无 pipewire-audio 子包（F34 时代命名）——按真机安装实况拆开列出
+        pipewire pipewire-pulseaudio wireplumber mesa-dri-drivers xdg-user-dirs \
         # --- CJK 字体（os/configs/theming 的 F44 实测包名，-vf- 变体）---
         google-noto-sans-cjk-vf-fonts google-noto-sans-mono-cjk-vf-fonts \
         default-fonts-core-sans \

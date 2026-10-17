@@ -163,7 +163,7 @@ ShellRoot {
           // 尺寸绑 screen（创建瞬间 contentItem 可能未定型，绑 parent.width 会得负值）
           readonly property real panelWidth: (win.screen?.width ?? 1280) - 24
           readonly property real maxH: (win.screen?.height ?? 800) - 24
-          readonly property real contentH: Math.min(view.contentHeight + 132, maxH)
+          readonly property real contentH: Math.min(view.contentHeight + 148, maxH)
 
           width: panelWidth
           height: contentH
@@ -194,7 +194,7 @@ ShellRoot {
           Column {
             anchors.fill: parent
             anchors.margins: 36
-            spacing: 44
+            spacing: 60
 
             // 标题：小号、常规字重、灰（Omarchy "Keybindings" 的层级：弱于正文）
             Text {
@@ -210,10 +210,10 @@ ShellRoot {
             ListView {
               id: view
               width: parent.width
-              height: parent.height - 132
+              height: parent.height - 148
               clip: true
               interactive: true
-              spacing: 10
+              spacing: 12
 
               model: {
                 const rows = [];
@@ -227,7 +227,7 @@ ShellRoot {
               delegate: Item {
                 required property var modelData
                 width: view.width
-                height: modelData.type === "h" ? 40 : 44
+                height: modelData.type === "h" ? 46 : 50
 
                 // 分组标题：常规字重小灰字 + 上方留白（Omarchy 无分组，取其标题区的弱化语感）
                 Text {
@@ -253,18 +253,18 @@ ShellRoot {
                     anchors.verticalCenter: parent.verticalCenter
                     text: modelData.type === "b" ? root.comboText(modelData.keys) : ""
                     color: root.colors.primary
-                    font.pixelSize: 19
+                    font.pixelSize: 24
                     font.family: "monospace"
                   }
 
                   Text {
                     id: arrowText
                     anchors.left: parent.left
-                    anchors.leftMargin: Math.round(parent.width * 0.54)
+                    anchors.leftMargin: Math.round(parent.width * 0.52)
                     anchors.verticalCenter: parent.verticalCenter
                     text: modelData.type === "b" ? "→" : ""
                     color: root.colors.primary
-                    font.pixelSize: 19
+                    font.pixelSize: 24
                     font.family: "monospace"
                   }
 
@@ -275,7 +275,7 @@ ShellRoot {
                     anchors.verticalCenter: parent.verticalCenter
                     text: modelData.type === "b" ? (modelData.title ?? "") : ""
                     color: root.colors.on_surface
-                    font.pixelSize: 19
+                    font.pixelSize: 24
                     font.family: "monospace"
                     elide: Text.ElideRight
                   }

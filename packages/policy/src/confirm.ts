@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { DEFAULT_POLICY_PATH, Policy } from "./policy.js";
 
-/** 用户在确认框四个按钮（+超时/服务不可用）里的选择 */
+/** 用户在四条确认横幅里的选择（+超时/服务不可用；mako 无动作按钮，一个选择一条横幅） */
 export type ConfirmChoice =
   | "allow_once"
   | "allow_session"

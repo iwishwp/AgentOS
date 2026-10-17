@@ -128,7 +128,7 @@ export function buildServer(
     {
       title: "向用户发起确认（T1 通道入口）",
       description:
-        "向用户弹一条带按钮的确认通知（org.agentos.Confirm1 → mako），阻塞等待选择：" +
+        "向用户弹四条确认横幅（org.agentos.Confirm1 → mako，一个选择一条，自上而下 允许/会话允许/拒绝/永不），阻塞等待选择：" +
         "allow_once 允许一次 / allow_session 本次会话允许 / deny_once 拒绝 / always_deny 永不；30 秒无响应视为拒绝。" +
         "适用：agent 主动向用户请示（工具策略之外的决定点）。注意 summary 里不要放任何敏感内容——它会显示在通知里。",
       inputSchema: {

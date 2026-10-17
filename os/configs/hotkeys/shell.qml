@@ -172,7 +172,19 @@ ShellRoot {
           anchors.top: parent.top
           anchors.topMargin: 40
           radius: 2
-          color: root.withAlpha(root.colors.surface_container, 0.88)
+
+          // 柔影近似：面板下垫一块略下移的半透明黑块（参考图有极淡投影）
+          Rectangle {
+            z: -1
+            width: panel.width
+            height: panel.height
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.top
+            anchors.topMargin: 14
+            radius: 10
+            color: root.withAlpha("#000000", 0.35)
+          }
+          color: root.withAlpha(root.colors.surface_container, 0.82)
           border.width: 1
           border.color: root.withAlpha(root.colors.outline_variant, 0.5)
 

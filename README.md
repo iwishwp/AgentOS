@@ -52,6 +52,7 @@ Atomic 镜像（bootc，需 podman）：`./scripts/build-image.sh --smoke`，
 ## 文档
 
 - [架构设计](docs/architecture.md)
+- [技术补课手册：Linux 桌面原理 + 本项目全组件详解](docs/tech-primer.md)
 - [里程碑开发计划](docs/milestones.md)
 - [开发日志与待办](DEVLOG.md)
 - [凭据代理与密码管理集成](docs/security/credentials.md)

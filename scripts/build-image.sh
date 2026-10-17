@@ -13,8 +13,11 @@
 #   --no-cache  podman build --no-cache（调试层缓存问题时用）
 #
 # 环境变量：
-#   AGENTOS_VM         Mac→VM 模式的 ssh 目标（默认 agentos-vm）
+#   AGENTOS_VM          Mac→VM 模式的 ssh 目标（默认 agentos-vm）
 #   AGENTOS_BUILD_JOBS 传 1 可限制并发步骤（3.8G 内存的 VM 构建 OOM 时用）
+#   GOOSE_INSTALL_MODE  设为 build 则透传给 Containerfile（构建期装 goose，
+#                       需构建环境可达 github.com——CI 适用；默认 firstboot）
+#   FEDORA_VERSION      基础镜像大版本（默认 44）
 #
 # x86_64 / CI 说明（本机无 docker/podman，无法交叉验证）：
 #   本脚本在 aarch64 VM 上构建 aarch64 镜像（tag: agentos:dev-aarch64）。
@@ -96,6 +99,7 @@ podman build "${JOBS_FLAG[@]}" "${EXTRA_FLAGS[@]}" \
     -f os/bootc/Containerfile \
     -t "$IMAGE_TAG" \
     --build-arg "FEDORA_VERSION=${FEDORA_VERSION}" \
+    ${GOOSE_INSTALL_MODE:+--build-arg "GOOSE_INSTALL_MODE=${GOOSE_INSTALL_MODE}"} \
     "$REPO_ROOT"
 
 # 3) 产物报告：大小 + 层数（bootc 层 = 更新时的传输/回滚粒度）
@@ -113,9 +117,16 @@ if [[ $SMOKE -eq 1 ]]; then
         echo "npm:       $(npm --version)";
         echo "gsr:       $(rpm -q gpu-screen-recorder)";
         echo "sddm:      $(rpm -q sddm)";
+        echo "greenboot: $(rpm -q greenboot)";
         echo "canvas:    $(node --check /usr/share/agentos/packages/canvas/dist/index.js && echo syntax-ok)";
         echo "defaults:  $(ls /usr/share/agentos/defaults/niri/)";
         echo "user-units:$(ls /usr/lib/systemd/user/ | grep agentos | tr "\n" " ")";
+        echo "gb-checks: $(ls /usr/lib/greenboot/check/required.d/ | tr "\n" " ")";
+        # greenboot 检查脚本在容器内直接跑一遍（此时 wants 链接已随 enable 落盘，
+        # 两个脚本都应返回 0；真实启动编排属磁盘引导验证，容器内无法覆盖）
+        for s in /usr/lib/greenboot/check/required.d/*.sh; do
+            "$s" && echo "gb-run:    $s -> 0" || echo "gb-run:    $s -> FAILED($?)";
+        done
     '
 fi
 

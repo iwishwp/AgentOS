@@ -105,6 +105,13 @@ RUN dnf -y install dnf5-plugins \
     && dnf -y install gpu-screen-recorder \
     && dnf clean all
 
+# ==== 层 2.5：greenboot 启动健康检查（「误更新自愈」的最后一环）====
+# greenboot 0.16.4（F44 仓库实测在包）原生支持 bootc：启动后跑 required.d
+# 检查脚本，连续不健康达阈值即自动 bootc rollback 回上一启动条目
+# （Bazzite 生产同款）。独立成层：与桌面层解耦，回滚语义与检查脚本
+# 设计说明见 docs/m5-atomic.md「greenboot 与回滚语义」。
+RUN dnf -y install greenboot && dnf clean all
+
 # ==== 层 3：AgentOS 组件（builder 产物：packages + dist + 生产 node_modules）====
 COPY --from=builder /build/ /usr/share/agentos/
 # 把 workspace 可执行入口（niri-mcp/desktop-mcp/.../agentos-canvas）挂到 PATH，
@@ -145,16 +152,20 @@ COPY os/configs/theming/gtk-4.0/           /usr/share/agentos/defaults/gtk-4.0/
 
 # 首启动脚本：goose 安装（网络受限时的兜底）+ 配置 only-if-absent 部署
 COPY os/bootc/firstboot/ /usr/share/agentos/bin/
-RUN chmod 0755 /usr/share/agentos/bin/*.sh
+# greenboot 必需健康检查（随镜像版本走，放 /usr/lib 而非 /etc——后者是机器本地态；
+# greenboot 0.16.4 两处都会扫，rpm -ql 实测）。脚本必须可执行（greenboot 直接 run）。
+COPY os/bootc/greenboot/check/ /usr/lib/greenboot/check/
+RUN chmod 0755 /usr/share/agentos/bin/*.sh /usr/lib/greenboot/check/required.d/*.sh
 
 # user 单元（对每个登录用户生效）：
 #   agentos-user-setup.service  —— 首次进入图形会话时部署默认配置（幂等）
 #   agentos-canvas.service      —— canvas 生成式 UI 服务（127.0.0.1:7788）
 #   agentos-goose-firstboot.service —— goose 缺失时装（GOOSE_INSTALL_MODE=firstboot 时才有意义）
 COPY os/bootc/systemd/ /usr/lib/systemd/user/
-# 系统单元：SDDM 显示管理器开机自启（bootc 下 systemctl enable 合法，
-# start 不行——构建期无 systemd 运行，bootc 官方文档明确）
-RUN systemctl enable sddm \
+# 系统单元：SDDM 显示管理器开机自启 + greenboot 启动健康检查（bootc 下
+# systemctl enable 合法，start 不行——构建期无 systemd 运行，bootc 官方文档明确）。
+# greenboot-healthcheck 的 [Install] 段通过 Also= 连带启用 rollback 触发器。
+RUN systemctl enable sddm greenboot-healthcheck.service \
     && systemctl --global enable agentos-user-setup.service agentos-canvas.service agentos-goose-firstboot.service
 
 # 构建期就用镜像里的 niri 校验默认配置（include 相对路径按配置文件位置解析，

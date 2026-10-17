@@ -18,28 +18,22 @@
 
 ## 2. 总体形态
 
-```
-┌─────────────────────────── 用户 seat ───────────────────────────┐
-│  niri（主会话）                                                  │
-│  ┌──────────┐ ┌──────────┐ ┌─────────────────────────────────┐  │
-│  │ 用户应用  │ │ 聊天/面板 │ │ “水族馆”窗口（agent 会话的投屏）  │  │
-│  └──────────┘ └──────────┘ └─────────────────────────────────┘  │
-│        Noctalia (QuickShell)：通知 / 启动器 / 状态               │
-└──────────────────────────────────┬──────────────────────────────┘
-                                   │ niri IPC / dbus / portals
-┌──────────────────────────────────▼──────────────────────────────┐
-│  agent 层                                                        │
-│  goose（systemd user service，集成不 fork）                      │
-│    ├─ MCP servers（自研“工具面”，见 §4）                         │
-│    └─ 会话/记忆/审批策略                                          │
-│  credential broker（凭据代理，见 docs/security/credentials.md）  │
-└──────────────────────────────────┬──────────────────────────────┘
-                                   │ 独立输出 + uinput（独立 seat）
-┌──────────────────────────────────▼──────────────────────────────┐
-│  agent seat：嵌套 niri 会话（V1，跑在用户桌面一个窗口里）          │
-│    LibreOffice / 浏览器 / 仅 GUI 的长尾应用                      │
-│    grim 截屏（只截自己的输出）· ydotool 输入（只进自己的 seat）   │
-└──────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph USER["用户 seat"]
+        n["niri（主会话）"]
+        u1["用户应用"] --- u2["聊天/面板"] --- aq["'水族馆'窗口<br/>（agent 会话的投屏）"]
+        ns["Noctalia (QuickShell)：通知 / 启动器 / 状态"]
+    end
+    subgraph AG["agent 层"]
+        g["goose（systemd user service，集成不 fork）<br/>MCP servers（自研'工具面'，见 §4）<br/>会话 / 记忆 / 审批策略"]
+        cb["credential broker（凭据代理）<br/>docs/security/credentials.md"]
+    end
+    subgraph AS["agent seat：嵌套 niri 会话（V1，跑在用户桌面一个窗口里）"]
+        v["LibreOffice / 浏览器 / 仅 GUI 的长尾应用<br/>grim 截屏（只截自己的输出）<br/>ydotool 输入（只进自己的 seat）"]
+    end
+    USER -- "niri IPC / dbus / portals" --> AG
+    AG -- "独立输出 + uinput（独立 seat）" --> AS
 ```
 
 ## 3. 人机并发模型（核心设计决策）

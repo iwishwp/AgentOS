@@ -36,22 +36,17 @@ AgentOS 的"极简组合"思路，就是在每一层挑一个最小的、协议�
   这个进程就是**显示服务器 / 合成器（compositor）**。没有它，每个应用都要自己抢显卡、
   自己上屏，会互相覆盖——所以"需要显示服务器"不是历史包袱，是并发显示的必然。
 
-```
-【图 1：显示栈分层——谁能碰什么】
+**图 1：显示栈分层——谁能碰什么**
 
-  应用（Firefox / Ghostty / goose）
-    │  自己渲染：CPU 或 GPU 把 UI 画进一块 buffer（画布）
-    │  "我画好了，这块画布给你" —— 交给显示服务器
-    ▼
-  显示服务器 = 合成器（niri）                 ← 全机唯一的 DRM master
-    │  ① 收下所有应用的 buffer，决定谁在哪、谁在上面
-    │  ② 合成：自己的 GPU 通道渲染最终画面（加边框/间距/模糊/动画）
-    │  ③ 经 KMS 把最终 framebuffer 送上屏幕
-    ▼
-  内核 DRM/KMS（/dev/dri/card*）
-    │  扫描输出（encoder/connector），按刷新率点亮屏幕
-    ▼
-  屏幕：像素
+```mermaid
+flowchart TD
+    app["应用（Firefox / Ghostty / goose）<br/>自己渲染：CPU 或 GPU 把 UI 画进一块 buffer（画布）"]
+    comp["显示服务器 = 合成器（niri）<br/>全机唯一的 DRM master<br/>① 收下所有应用的 buffer，决定谁在哪、谁在上面<br/>② 合成：自己的 GPU 通道渲染最终画面（边框/间距/模糊/动画）<br/>③ 经 KMS 把最终 framebuffer 送上屏幕"]
+    drm["内核 DRM/KMS（/dev/dri/card*）<br/>扫描输出（encoder/connector），按刷新率点亮屏幕"]
+    screen["屏幕：像素"]
+    app -- "'我画好了，这块画布给你'（wl_surface + buffer）" --> comp
+    comp -- "最终 framebuffer" --> drm
+    drm --> screen
 ```
 
 一个实战佐证：仓库实测记录里 niri 黑屏卡登录的根因就是这层——"niri 是 GLES 合成器
@@ -84,20 +79,24 @@ GNOME 能进不代表 3D 开了（它有软渲染兜底）。
   Wayland 窗口）。我们仓库用的独立实现叫 `xwayland-satellite`（`docs/real-machine.md`
   §0.1，可选组件，不测 X11 应用可跳过）。
 
-```
-【图 2：X11 与 Wayland 的角色对比】
+**图 2：X11 与 Wayland 的角色对比**
 
-  X11 世界（WM 与合成器是两个客户端，隔着 X Server 打配合）:
-    应用 ─┐                        ┌─ 窗口管理器(另一客户端): 决定摆位
-          ├─→ X Server(显示+输入) ─┤
-    应用 ─┘   （中央大管家）        └─ 合成器(又一客户端): 决定叠影/效果
-
-  Wayland 世界（合成器即显示服务器，一个进程说了算）:
-    应用(Ghostty) ──┐                        niri = 显示服务器
-    应用(Firefox) ──┼─ wl_surface + buffer →  + 窗口管理器 + 合成器
-    XWayland 桥  ──┘   （"画好了，请合成"）     + 唯一 DRM master
-                              ▲
-                              └─ libinput/seat：输入也由它分发
+```mermaid
+flowchart LR
+    subgraph X11["X11 世界：中央大管家模式"]
+        direction TB
+        xa1["应用"] --> xs
+        xa2["应用"] --> xs["X Server（显示+输入）<br/>中央大管家"]
+        xs -- "建议摆位" --> xwm["窗口管理器（另一客户端）"]
+        xs -- "叠影/效果" --> xc["合成器（又一客户端）"]
+    end
+    subgraph WL["Wayland 世界：合成器即显示服务器"]
+        direction TB
+        wa1["应用（Ghostty）"] --> niri
+        wa2["应用（Firefox）"] --> niri["niri = 显示服务器 + 窗口管理器<br/>+ 合成器 + 唯一 DRM master"]
+        wx["XWayland 桥（X11 遗留应用）"] -- "wl_surface + buffer：'画好了，请合成'" --> niri
+        niri -- "libinput / seat：输入也由它分发" --> niri
+    end
 ```
 
 ## 1.3 会话与权限底座：systemd / logind / D-Bus / polkit / portal / keyring / PipeWire / 通知
@@ -195,18 +194,24 @@ keyring 锁定曾把 Chromium 网络栈整个挂死（M3 悬案，`docs/real-mac
   Wayland 移植 **Sway**。窗口组织成树（容器嵌容器）。
 - **滚动平铺（scrollable tiling）**：**niri** 开创的第三条路。见下节。
 
-```
-【图 3：三种平铺模型对比（同屏 4 个窗口 W1–W4）】
+**图 3：平铺谱系——谁来决定布局**
 
-  动态平铺 (dwm/Hyprland)          手动平铺 (i3/Sway)           滚动平铺 (niri)
-  ┌──────┬─────────┐         ┌───────┬─────────┐        ──────┬─────────┬──────
-  │ W1   │ W2      │         │ W1|W2 │ W3      │        (W0)   │ W1      │ W2
-  │      ├────┬────┤         │      │────┬────┤               ├─────────┤
-  │ W3   │ W4 │…  │         │  树   │ W4 │…  │               │ W3  W4  │
-  └──────┴────┴────┘         └───────┴────┴────┘               （继续向右滚动）
-  开窗即自动重切                 用户下刀，结构即树             一条无限横带，左右滚动
-  布局是 WM 的决定               布局是用户的决定               布局是"排列"而非"切分"
+```mermaid
+flowchart TD
+    t["平铺式桌面<br/>窗口不重叠 · 键盘驱动 · 焦点跟布局"]
+    t --> d["动态平铺<br/>开窗即自动重切屏幕，布局是 WM 的决定<br/>dwm · awesome · Hyprland"]
+    t --> m["手动平铺<br/>用户下刀（容器里再切），结构即树，布局是用户的决定<br/>i3（X11）· Sway（Wayland）"]
+    t --> s["滚动平铺<br/>一条无限横带左右滚动，布局是'排列'而非'切分'<br/>niri（本项目）"]
 ```
+
+三种模型同屏 4 个窗口（W1–W4）的直观对照：
+
+| | 动态（dwm/Hyprland） | 手动（i3/Sway） | 滚动（niri） |
+|---|---|---|---|
+| 开新窗口时 | WM 自动重切全屏 | 用户选容器切一刀 | 进当前列，或开新列向右生长 |
+| 屏外内容 | 缩小/堆叠 | 树上折叠 | 自然滚到左边，随时滚回 |
+| 布局决定者 | WM | 用户 | 「排列」而非「切分」 |
+| 代表 | dwm、awesome、Hyprland | i3、Sway | **niri** |
 
 ### 1.4.2 工作区、焦点模型、键盘驱动
 
@@ -288,25 +293,28 @@ plasma-shell，含状态栏、启动器、通知、设置）+ 一整套应用与
 体验统一；代价是体量大、组件间非标准耦合、每个组件都难单独替换。AgentOS 走
 "wlroots 生态的极简拼装"：每层一个单一职责的小组件，用标准协议咬合。
 
-```
-【图 4：两种桌面的架构对照】
+**图 4：两种桌面的架构对照**
 
-  GNOME                                    AgentOS（niri 极简组合）
-  ┌──────────────────────────────┐         ┌──────────────────────────────┐
-  │ gnome-shell（面板/启动器/OV…）│         │ Noctalia @ QuickShell（bar/  │
-  │  （自己一套 JS 扩展体系）      │         │  壁纸/启动器/控制中心，QML）   │
-  ├──────────────────────────────┤         ├──────────────────────────────┤
-  │ Mutter = 合成器+显示服务器    │         │ niri = 合成器+显示服务器      │
-  │        + WM（滚动无、平铺无） │         │       + WM（滚动平铺）+ IPC   │
-  ├──────────────────────────────┤         ├──────────────────────────────┤
-  │ gnome-keyring / pipewire /   │         │ gnome-keyring / PipeWire /   │
-  │ xdg-desktop-portal-gnome ... │         │ portal-gnome+gtk ...（同标准）│
-  ├──────────────────────────────┤         ├──────────────────────────────┤
-  │ GDM                          │         │ GDM（现役 VM）/ SDDM（镜像线）│
-  └──────────────────────────────┘         └──────────────────────────────┘
-  通知: gnome-shell 内置           通知: mako（独立守护进程）
-  终端: gnome-terminal             终端: Ghostty   启动器: fuzzel
-  锁屏: gnome-shell 内置           锁屏: swaylock  截图: grim + niri 内置
+```mermaid
+flowchart LR
+    subgraph G["GNOME：一家全包"]
+        direction TB
+        gs["gnome-shell（面板/启动器/概览…，JS 扩展体系）"]
+        mut["Mutter = 合成器 + 显示服务器 + WM<br/>（无平铺、无 JSON IPC）"]
+        gi["gnome-keyring · PipeWire · xdg-desktop-portal-gnome"]
+        gdm1["GDM"]
+        gn["通知：gnome-shell 内置 · 终端：gnome-terminal<br/>锁屏：内置"]
+        gs --> mut --> gi --> gdm1
+    end
+    subgraph A["AgentOS：极简拼装（标准协议咬合）"]
+        direction TB
+        ns["Noctalia @ QuickShell（bar/壁纸/启动器/控制中心，QML）"]
+        nn["niri = 合成器 + 显示服务器<br/>+ WM（滚动平铺）+ JSON IPC"]
+        ai["gnome-keyring · PipeWire<br/>portal-gnome + gtk（同标准）"]
+        dm["GDM（现役 VM）/ SDDM（镜像线）"]
+        an["通知：mako（独立守护）· 终端：Ghostty<br/>启动器：fuzzel · 锁屏：swaylock · 截图：grim + niri 内置"]
+        ns --> nn --> ai --> dm
+    end
 ```
 
 对照的要点不是"谁好"，而是职责切分：把 shell 从合成器边上拆出来（QuickShell +
@@ -444,22 +452,24 @@ zod 声明参数 schema。
 {"jsonrpc":"2.0","id":7,"result":{"content":[{"type":"text","text":"[{\"id\":42,...}]"}]}}
 ```
 
-```
-【图 5：MCP 架构——goose 与九个包的位置】
+**图 5：MCP 架构——goose 与九个包的位置**
 
-                     ┌───────────────────────────────────────────┐
-                     │ goose（agent 引擎，systemd user service）  │
-                     │  会话/上下文/审批 · 行为基线(goose-system.md)│
-                     └───┬─────┬─────┬─────┬─────┬─────┬─────┬───┘
-        stdio JSON-RPC（每个扩展一个子进程，scripts/env/with-*.sh 补环境）
-      ┌─────────┬─────────┼─────────┼──────┼──────┼──────┼──────┬─────────┐
-      ▼         ▼         ▼         ▼      ▼      ▼      ▼      ▼         ▼
-  niri-mcp  desktop-mcp system-mcp files- session- atspi- browser- cred-mcp  (goose 内建
-  (窗口/WS) (桌面交互)  (系统只读+  mcp   mcp    mcp    mcp    (凭据代理)   扩展×4)
-                        装包T2)    (水族馆)(a11y) (CDP)
-      │         │         │        │      │      │        │        │
-      └── 全部经 @agentos/policy 的 createGate 统一注册：decide→审计→(confirm)→执行 ──┘
-                              （支撑包：policy · proc · canvas）
+```mermaid
+flowchart TD
+    goose["goose（agent 引擎，systemd user service）<br/>会话/上下文/审批 · 行为基线（goose-system.md）"]
+    goose -.-> builtin["goose 内建扩展 ×4"]
+    goose -- "stdio JSON-RPC（每个扩展一个子进程，scripts/env/with-*.sh 补环境）" --> gate
+    subgraph gate["8 个自研 MCP server —— 全部经 @agentos/policy 的 createGate 统一注册：decide → 审计 → (confirm) → 执行"]
+        n["niri-mcp<br/>窗口/工作区"]
+        d["desktop-mcp<br/>桌面交互/confirm"]
+        s["system-mcp<br/>系统只读 + 装包 T2"]
+        fi["files-mcp<br/>工作区沙箱"]
+        se["session-mcp<br/>水族馆"]
+        at["atspi-mcp<br/>无障碍树 a11y"]
+        br["browser-mcp<br/>CDP"]
+        cr["cred-mcp<br/>凭据代理"]
+    end
+    gate --> sup["支撑包：policy · proc · canvas"]
 ```
 
 逐包讲（工具数合计 47，README 口径"40+"；每个 server 的工具清单以
@@ -547,19 +557,22 @@ VM 实测（`docs/real-machine.md` 2026-10-17）。
 `vault://组/名` 引用；明文从 Secret Service（底座）流出后只存在于 broker 栈帧/子进程
 里，永远不作为工具返回值：
 
-```
-【图 6：安全链路——明文的最短路径与三通道】
+**图 6：安全链路——明文的最短路径与三通道**
 
-  agent（goose 上下文）──只说"用 vault://bank/login"──→ cred-mcp（broker）
-                                                          │ secret-tool 取明文
-                                                          ▼
-                                              Secret Service（gnome-keyring）
-   通道 A 自动填充（网页登录）   通道 B 代执行（CLI 命令）   通道 C 短期注入
-   broker 经 CDP 在页面内设值    broker 直接 spawn 子进程    broker 起 wrapper 进程
-   → 页面内逐字节复核 matches    → 明文只进子进程 env        → 短 TTL token 注入 env
-   → 回执只有长度+sha256        → agent 只拿 stdout/exit    → TTL 到点收割进程组
-   （明文不出页面/broker 栈帧）   → 输出中明文出现处打码      （实测 3.2s 被杀 exit 124）
-        ▲ ▲ ▲ 明文永不越过这条线（回到 agent 的只有：结果、哈希、退出码）▲ ▲ ▲
+```mermaid
+flowchart TD
+    agent["agent（goose 上下文）"]
+    broker["cred-mcp（broker）"]
+    ss["Secret Service（gnome-keyring）"]
+    agent -- "只说'用 vault://bank/login'" --> broker
+    broker -- "secret-tool 取明文" --> ss
+    broker --> a["通道 A · 自动填充（网页登录）<br/>broker 经 CDP 在页面内设值<br/>页面内逐字节复核 matches<br/>回执只有长度 + sha256"]
+    broker --> b["通道 B · 代执行（CLI 命令）<br/>broker 直接 spawn 子进程<br/>明文只进子进程 env<br/>agent 只拿打码后的 stdout / exit"]
+    broker --> c["通道 C · 短期注入<br/>broker 起 wrapper 进程<br/>短 TTL token 注入 env<br/>到点收割进程组（实测 3.2s，exit 124）"]
+    ret["回到 agent 的只有：结果、哈希、退出码<br/>——明文永不越过 broker 边界这条线"]
+    a --> ret
+    b --> ret
+    c --> ret
 ```
 
 每条凭据一条策略（`~/.config/agentos/credentials.yaml`：`allow` 通道白名单 +
@@ -621,24 +634,15 @@ agent 的"眼睛和手"，分层兜底（L0 IPC → L1 无障碍树 → L2 浏�
 
 一条 T0 为主的流水线，policy 全程放行、全程留痕：
 
-```
-用户（goose 会话）:"把 ~/Agent/downloads 里的文件整理成周报"
-  │
-  ▼ 1. goose 按行为基线选工具（不用 shell）
-files-mcp: list_dir / read_file / find_by_name ──T0 allow──→ 审计 JSONL 追加
-  │  （沙箱纪律：路径越界防护在 workspace 层兜底）
-  ▼ 2. 生成文档
-files-mcp: write_file reports/weekly.fodt      ──T0 allow──→ 审计
-  │  （产物统一落工作区 ~/Agent/，goose-system.md §产物落位）
-  ▼ 3. 调起 LibreOffice 展示
-desktop-mcp: open(path, app=libreoffice)
-  │  按权限表建议为 T1（动用户桌面）：部署的 policy.yaml 若配 confirm，
-  │  此处先经 Confirm1 弹四横幅等用户点选；M1 首次实测时配 allow+审计
-  ▼ 4. 告知结果
-desktop-mcp: notify("周报已生成并打开")         ──T0（通知是确认通道本身）──→
-  │  mako 横幅 → 用户看到
-  ▼ 5.（可选）仪表盘版进 canvas
-files-mcp: write_file canvas/weekly/index.html → desktop-mcp: open("http://127.0.0.1:7788/weekly/")
+```mermaid
+flowchart TD
+    u["用户（goose 会话）：'把 ~/Agent/downloads 里的文件整理成周报'"]
+    f1["① goose 按行为基线选工具（不用 shell）<br/>files-mcp：list_dir / read_file / find_by_name<br/>T0 allow → 审计 JSONL 追加（沙箱路径防护在 workspace 层兜底）"]
+    f2["② 生成文档<br/>files-mcp：write_file reports/weekly.fodt<br/>T0 → 审计（产物统一落 ~/Agent，goose-system.md §产物落位）"]
+    d1["③ 调起 LibreOffice 展示<br/>desktop-mcp：open(path, app=libreoffice)<br/>建议 T1：policy 配 confirm 时先经 Confirm1 四横幅；M1 首测时配 allow+审计"]
+    d2["④ 告知结果<br/>desktop-mcp：notify('周报已生成并打开')<br/>T0（通知是确认通道本身）→ mako 横幅 → 用户看到"]
+    c1["⑤ 可选：仪表盘版进 canvas<br/>write_file canvas/weekly/index.html<br/>→ open('http://127.0.0.1:7788/weekly/')"]
+    u --> f1 --> f2 --> d1 --> d2 --> c1
 ```
 
 要点：M1 退出标准就是这条链的实证版（下载→整理→生成 .fodt→LibreOffice 展示→通知，
@@ -646,25 +650,25 @@ files-mcp: write_file canvas/weekly/index.html → desktop-mcp: open("http://127
 
 ## 场景 B：需要密码的网页登录（零明文机制细节）
 
-```
-【图 7：场景 B 时序——明文永远不进模型上下文】
+**图 7：场景 B 时序——明文永远不进模型上下文**
 
-  goose      session-mcp   browser-mcp   cred-mcp(broker)  Secret Service   mako/用户
-    │ start水族馆 │             │              │                │              │
-    ├────────────▶│ 嵌套 niri 起 │              │                │              │
-    │             │ (独立 seat) │              │                │              │
-    │ browser_open─────────────▶│ Chromium 无头启动在水族馆内     │              │
-    │             │             │ (--password-store=basic：    │              │
-    │             │             │  绝不碰用户 keyring)          │              │
-    │ cred_autofill(vault://…, 页面)──────────▶│               │              │
-    │             │             │              │ secret-tool ──▶│ 取出明文     │
-    │             │             │◀─ CDP: 页面内 el.value=明文 +派发 input 事件 │
-    │             │             │── 页面内复核: el.value===注入值 (matches)   │
-    │             │             │   （明文不出页面/broker 栈帧） │              │
-    │◀─ 回执: {matches:true, length:N, sha256:...} ──────────── │              │
-    │  （模型上下文里只有哈希与长度——物理上没有明文可泄漏）      │              │
-    │ browser_eval(读登录态) / browser_screenshot …             │              │
-    │ desktop.notify("已用 vault://bank/login 登录") ──────────────────────────▶│
+```mermaid
+sequenceDiagram
+    participant G as goose
+    participant S as session-mcp
+    participant B as browser-mcp
+    participant C as cred-mcp (broker)
+    participant K as Secret Service
+    participant U as mako / 用户
+    G->>S: agent_session_start（水族馆：嵌套 niri，独立 seat）
+    G->>B: browser_open（Chromium 无头启动在水族馆内；<br/>--password-store=basic：绝不碰用户 keyring）
+    G->>C: cred_autofill(vault://…, 页面)
+    C->>K: secret-tool 取出明文
+    C->>B: CDP：页面内 el.value=明文 + 派发 input 事件
+    B->>B: 页面内复核 el.value===注入值（matches；<br/>明文不出页面/broker 栈帧）
+    C-->>G: 回执 {matches:true, length:N, sha256:…}<br/>（模型上下文里只有哈希与长度——物理上没有明文可泄漏）
+    G->>B: browser_eval（读登录态）/ browser_screenshot
+    G->>U: desktop.notify("已用 vault://bank/login 登录")
 ```
 
 机制细节（`docs/security/credentials.md` §2 通道 A）：非安全上下文（如 data: URL 测试页）
@@ -675,31 +679,19 @@ files-mcp: write_file canvas/weekly/index.html → desktop-mcp: open("http://127
 
 ## 场景 C：agent 要装包（T2 全链）
 
-```
-【图 8：场景 C——快照 → pkexec/polkit → 审计 → 回滚指引】
+**图 8：场景 C——快照 → pkexec/polkit → 审计 → 回滚指引**
 
-  用户:"帮我装 sl" → goose
-    │ system-mcp: package_install("sl")
-    ▼
-  policy 网关 decide → "confirm" + tier=t2 + delegatedConfirm ──审计: confirm.result=delegated
-    │ （确认由 handler 内的 polkit 强认证承担，不走 Confirm1 横幅）
-    ▼
-  PackageInstaller 执行 pkexec /usr/libexec/agentos/pkg-install sl
-    │  polkit rules(49-agentos.rules): 本 helper → auth_admin（每次都要密码）
-    │  认证框由图形会话里的 lxqt-policykit-agent 承接（niri spawn-at-startup）
-    │  （实测：认证框弹出即聚焦，键盘驱动直输密码；ydotool 键盘路径已验证）
-    ▼
-  root helper（os/polkit/pkg-install）:
-    ① 包名字符集校验（拒绝 --config/@group/URL 等一切注入面）
-    ② systemctl stop packagekit（实测：packagekitd 会抢 rpm 锁）
-    ③ snapper create --read-only agentos-pre-dnf-sl   ← 快照失败即中止！
-    ④ dnf install -y sl → 退出码 + AGENTOS_SNAPSHOT=N 回传
-    ▼
-  审计记录: {tool:package_install, tier:t2, confirm:{result:delegated,by:polkit},
-             snapshot:"8"}                ──失败时回复附 snapshot rollback 8 指引
-    ▼
-  （若事后判定误装）: /replay 时间轴定位事件 → snapper rollback 8 → 重启回滚态
-    → dnf remove sl 落定撤销    ——M4 退出标准演示的完整走线
+```mermaid
+flowchart TD
+    u["用户：'帮我装 sl' → goose"]
+    t["system-mcp：package_install(sl)"]
+    gw["policy 网关 decide：confirm + tier=t2 + delegatedConfirm<br/>（确认由 handler 内 polkit 强认证承担，不走 Confirm1 横幅）<br/>审计：confirm.result=delegated"]
+    pk["PackageInstaller：pkexec /usr/libexec/agentos/pkg-install sl"]
+    pa["polkit rules（49-agentos.rules）：本 helper → auth_admin（每次都要密码）<br/>认证框由图形会话里的 lxqt-policykit-agent 承接（niri spawn-at-startup）"]
+    rh["root helper（os/polkit/pkg-install）<br/>① 包名字符集校验（拒绝 --config/@group/URL 等注入面）<br/>② systemctl stop packagekit（实测 packagekitd 会抢 rpm 锁）<br/>③ snapper create --read-only agentos-pre-dnf-sl ← 快照失败即中止<br/>④ dnf install -y sl → 退出码 + AGENTOS_SNAPSHOT=N 回传"]
+    au["审计：{tool:package_install, tier:t2,<br/>confirm:{result:delegated, by:polkit}, snapshot:'8'}<br/>失败时回复附 snapshot rollback 8 指引"]
+    rb["（若事后判定误装）/replay 时间轴定位事件<br/>→ snapper rollback 8 → 重启回滚态 → dnf remove sl 落定撤销<br/>——M4 退出标准演示的完整走线"]
+    u --> t --> gw --> pk --> pa --> rh --> au --> rb
 ```
 
 实测坑全部记录在 `docs/permissions.md` §4.2 修订与 `docs/real-machine.md`
@@ -708,30 +700,26 @@ subvol 使 set-default 回滚不生效——永久化回滚因此指向 M5 bootc
 
 ## 场景 D：开机自举链（bootc 镜像形态）
 
-```
-【图 9：开机自举——从引导器到 agent 就绪】
+**图 9：开机自举——从引导器到 agent 就绪**
 
-  固件(UEFI) → bootloader(GRUB/bootc 启动条目，多版本并列=回滚的物理载体)
-    ▼
-  内核 + 只读 /usr（bootc 部署的 OCI 镜像用户空间）
-    ▼
-  systemd(PID1) ── systemctl enable sddm（镜像层5 固化）──▶ SDDM 显示管理器
-    ▼ 用户登录，选择 Niri 会话（/usr/share/wayland-sessions/niri.desktop）
-  niri-session（niri 的 systemd 集成）──▶ 绑定 graphical-session.target
-    ├─ spawn-at-startup "mako"                       （通知守护）
-    ├─ spawn-at-startup "env QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1
-    │                    /usr/libexec/lxqt-policykit-agent"（T2 认证代理+可被a11y驱动）
-    └─ spawn-at-startup "qs" "-c" "noctalia"          （桌面 shell，layer-shell 表面）
-    ▼ graphical-session.target 就绪，user 单元依次启动（镜像线装了这三个）：
-  agentos-user-setup.service      ── 默认配置 only-if-absent 复制进 ~/.config/
-                                      （源: /usr/share/agentos/defaults/，幂等不覆盖用户改动）
-  agentos-goose-firstboot.service ── goose 缺失则装到 ~/.local/bin（成功盖 stamp，永不阻断登录）
-  agentos-canvas.service          ── canvas 服务 127.0.0.1:7788
-  （Confirm1 与 goose 常驻单元在 os/systemd/ 供手动部署，尚未进镜像层——
-    待核实项：M5 后续是否补进 os/bootc/systemd/）
-    ▼
-  桌面就绪：niri(平铺) + Noctalia(bar) + mako(通知) + canvas + goose
-  用户打开终端（Super+Return → ghostty）→ goose session 或聊天面板 → 开始对话
+```mermaid
+flowchart TD
+    fw["固件 UEFI → 引导器（GRUB / bootc 启动条目）<br/>多版本并列 = 回滚的物理载体"]
+    kr["内核 + 只读 /usr（bootc 部署的 OCI 镜像用户空间）"]
+    sd["systemd（PID1）—— 镜像层 5 固化 systemctl enable sddm"]
+    sddm["SDDM 显示管理器 → 用户登录，选 Niri 会话<br/>（/usr/share/wayland-sessions/niri.desktop）"]
+    niri["niri-session（niri 的 systemd 集成）<br/>绑定 graphical-session.target"]
+    m1["spawn mako（通知守护）"]
+    m2["spawn lxqt-policykit-agent<br/>（QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1：<br/>T2 认证代理 + 可被 a11y 驱动）"]
+    m3["spawn qs -c noctalia<br/>（桌面 shell，layer-shell 表面）"]
+    u1["agentos-user-setup.service<br/>默认配置 only-if-absent 复制进 ~/.config/<br/>（源 /usr/share/agentos/defaults/，幂等不覆盖用户改动）"]
+    u2["agentos-goose-firstboot.service<br/>goose 缺失则装 ~/.local/bin<br/>（成功盖 stamp，永不阻断登录）"]
+    u3["agentos-canvas.service（127.0.0.1:7788）"]
+    ready["桌面就绪：niri（平铺）+ Noctalia（bar）+ mako（通知）+ canvas + goose<br/>Super+Return → ghostty → goose session / 聊天面板 → 开始对话"]
+    fw --> kr --> sd --> sddm --> niri
+    niri --> m1 & m2 & m3
+    niri -- "graphical-session.target 就绪（镜像线装了上面三个 user 单元）" --> u1 & u2 & u3
+    u1 & u2 & u3 --> ready
 ```
 
 要点：bootc 形态下 SDDM+niri 尚未真机点亮（`docs/m5-atomic.md` §9 遗留）；VM 现役
@@ -740,32 +728,34 @@ subvol 使 set-default 回滚不生效——永久化回滚因此指向 M5 bootc
 
 ## 全局架构总图
 
-```
-【图 10：AgentOS 全局架构——用户 ↔ 桌面 ↔ agent ↔ 系统能力 ↔ 安全层】
+**图 10：AgentOS 全局架构——用户 ↔ 桌面 ↔ agent ↔ 系统能力 ↔ 安全层**
 
-┌────────────────────────────── 用户 seat（主 niri 会话）──────────────────────────────┐
-│  ┌────────┐ ┌────────┐ ┌──────────────────────┐   layer-shell: Noctalia bar/壁纸    │
-│  │ghostty │ │ Firefox│ │ "水族馆"窗口          │   fuzzel 启动器 · swaylock 锁屏      │
-│  └────────┘ └────────┘ │ (agent 嵌套会话的投屏) │   mako 通知（Confirm1 四横幅载体）  │
-│                         └──────────┬───────────┘                                      │
-│        niri（合成器/WM/显示服务器，JSON IPC）· GDM/SDDM（显示管理）                    │
-└───────────┬────────────────────────┬──────────────────┬─────────────────────────────┘
-            │ niri IPC               │ D-Bus 会话总线     │ Wayland(嵌套)
-            │                        │                    ▼
-┌───────────▼────────────────────────▼──────┐   ┌──────────────────────────────────┐
-│ agent 层：goose（systemd user service）    │   │ agent 会话（水族馆，独立 seat）    │
-│  MCP 扩展×8 ──全部经 createGate 策略网关──┤   │  嵌套 niri · Chromium(无头,CDP)   │
-│  niri/desktop/system/files/session/       │   │  LibreOffice 等 GUI 长尾应用      │
-│  atspi/browser/cred                       │   │  grim 截图(只截自己) · ydotool兜底 │
-│  cred-mcp → Secret Service(gnome-keyring) │   └──────────────────────────────────┘
-│  canvas(127.0.0.1:7788) · Confirm1        │
-└───────────┬───────────────────────────────┘
-            │ T2: pkexec/polkit(root helper+快照)   · systemd 系统总线 · portal
-┌───────────▼─────────────────────────────────────────────────────────────────────────┐
-│ 系统能力层：dnf/包管理 · systemd 服务/日志 · 文件系统(~/Agent 沙箱) · 网络 · DRM/KMS   │
-│ 信任底座：bootc 原子更新/回滚（镜像态）· btrfs+snapper 快照（Workstation 态）· 审计   │
-│           ~/.local/state/agentos/audit.jsonl ← 全部工具调用结构化落盘 → /replay 回放  │
-└──────────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph USER["用户 seat（主 niri 会话）"]
+        w1["ghostty"] --- w2["Firefox"] --- aqw["'水族馆'窗口<br/>（agent 嵌套会话的投屏）"]
+        ls["layer-shell：Noctalia bar/壁纸 · fuzzel 启动器 · swaylock 锁屏<br/>mako 通知（Confirm1 四横幅载体）"]
+        main["niri（合成器/WM/显示服务器，JSON IPC）· GDM/SDDM（显示管理）"]
+    end
+    subgraph AGENT["agent 层：goose（systemd user service）"]
+        mcp["MCP 扩展 ×8 —— 全部经 createGate 策略网关<br/>niri / desktop / system / files / session / atspi / browser / cred"]
+        cred["cred-mcp → Secret Service（gnome-keyring）"]
+        cv["canvas（127.0.0.1:7788）· Confirm1"]
+    end
+    subgraph AQM["agent 会话（水族馆，独立 seat）"]
+        nest["嵌套 niri · Chromium（无头，CDP）<br/>LibreOffice 等 GUI 长尾应用<br/>grim 截图（只截自己）· ydotool 兜底"]
+    end
+    subgraph SYS["系统能力层 + 信任底座"]
+        sys1["dnf/包管理 · systemd 服务/日志 · 文件系统（~/Agent 沙箱）· 网络 · DRM/KMS"]
+        trust["bootc 原子更新/回滚（镜像态）· btrfs+snapper 快照（Workstation 态）"]
+        audit["审计 ~/.local/state/agentos/audit.jsonl<br/>全部工具调用结构化落盘 → /replay 回放"]
+    end
+    main -- "niri IPC" --> mcp
+    main -- "D-Bus 会话总线" --> cv
+    aqw -- "Wayland（嵌套）" --> nest
+    mcp --> cred
+    mcp -- "T2：pkexec/polkit（root helper + 快照）· systemd 系统总线 · portal" --> sys1
+    sys1 --- trust --- audit
 ```
 
 ---

@@ -1,0 +1,78 @@
+# =============================================================================
+# AgentOS bootc 镜像双架构 CI（M5，docs/m5-atomic.md §7 实装）
+#
+# 为什么是「原生 runner matrix」而不是交叉构建：
+#   bootc 镜像含内核与 rpm transaction，QEMU binfmt 交叉模拟构建慢且不可靠
+#   （dnf 在模拟层下跑 rpm 脚本时常挂死）——x86_64 必须在 x86_64 runner 上
+#   原生构建，aarch64 同理。本仓库本地只有 arm 机器（Mac/VM），x86_64 Tier 1
+#   （ADR-0001）从未构建过，本 workflow 就是它的唯一验证路径。
+#
+# runner 说明：
+#   ubuntu-24.04      = GitHub 托管 amd64 runner（免费额度内）
+#   ubuntu-24.04-arm  = GitHub 托管 arm64 runner（仅公开仓库免费；私有仓库
+#                        需付费或自托管 arm runner 替换本字段）
+#
+# 状态（如实标注）：本 workflow 未在本仓库实际运行过——仓库尚无 git remote，
+# 只做了本地静态校验（YAML 语法 + actionlint + 引用路径/参数一致性，
+# 见 docs/m5-atomic.md §7）。首次接入 GitHub 后从 workflow_dispatch 手动
+# 触发验证，再放开 push 触发。
+# =============================================================================
+name: build-image
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write   # tag 构建推 GHCR 用
+
+env:
+  # CI 网络可达 github.com（与本地受限网络相反）——goose 直接烘焙进镜像，
+  # 用户开箱即得（firstboot 兜底路径仍保留，见 Containerfile ARG 说明）
+  GOOSE_INSTALL_MODE: build
+
+jobs:
+  build:
+    name: bootc image (${{ matrix.arch }})
+    strategy:
+      fail-fast: false   # 一侧架构失败不连坐，便于分别修
+      matrix:
+        include:
+          - { arch: amd64, runner: ubuntu-24.04 }      # x86_64 原生
+          - { arch: arm64, runner: ubuntu-24.04-arm }  # aarch64 原生
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install podman（runner 未预装时兜底）
+        run: |
+          command -v podman >/dev/null && echo "podman already: $(podman --version)" && exit 0
+          sudo apt-get update && sudo apt-get install -y podman
+
+      - name: Build image + smoke（脚本会自报镜像大小/层数）
+        run: ./scripts/build-image.sh --smoke
+
+      - name: Arch sanity（防 runner 标签与实际架构不符）
+        run: |
+          echo "uname -m = $(uname -m), expect ${{ matrix.arch }}"
+
+      - name: Push to GHCR（仅 tag 构建）
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          # GHCR 推送用内置 GITHUB_TOKEN 即可；如组织策略要求 PAT，
+          # 换成 secrets.GHCR_TOKEN（占位）并同步改用户名
+          REGISTRY_AUTH: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          IMAGE="ghcr.io/${{ github.repository }}/agentos"
+          TAG="${{ github.ref_name }}-${{ matrix.arch }}"
+          echo "${REGISTRY_AUTH}" | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+          podman tag "agentos:dev-$(uname -m)" "${IMAGE}:${TAG}"
+          podman push "${IMAGE}:${TAG}"
+
+      # TODO（M5 后续）：tag 构建追加 manifest 合并双架构 + bootc-image-builder
+      # 出 ISO/RAW 安装介质（草案见 docs/m5-atomic.md §7 注释块）。届时用户端
+      # 可直接 `bootc switch` 引用多架构 manifest。

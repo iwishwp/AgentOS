@@ -1,0 +1,30 @@
+# =============================================================================
+# bootc-image-builder 磁盘镜像构建配置（M5「30 分钟全新机器」链路）
+#
+# 用法（VM 上，rootful）：
+#   sudo podman run --rm --privileged \
+#     --security-opt label=type:unconfined_t \
+#     -v /var/lib/containers/storage:/var/lib/containers/storage \
+#     -v <本文件>:/config.toml \
+#     -v <输出目录>:/output \
+#     quay.io/centos-bootc/bootc-image-builder:latest \
+#     --type qcow2 --config /config.toml --local -o /output \
+#     localhost/agentos:dev-<arch>
+#
+# 内容语义（blueprint customizations，osbuild schema）：
+#   * 预置用户 demon / wheel 组 —— 新 VM 开箱可 ssh 自动化验证（无图形
+#     交互也能进系统检查 firstboot 单元），也供 SDDM 图形登录（密码同下）；
+#   * 启用 sshd —— fedora-bootc 基座自带 openssh-server（rpm -q 实测），
+#     这里只做 enable，不引入新包；仅绑定的 NAT 网络可达，无公网暴露。
+#
+# 安全注意：123456 是本项目测试环境的既定弱密码（与现有 VM 一致，方便
+# 自动化验证）。正式发行镜像不应携带任何预置用户/密码——届时本文件只保留
+# sshd 一项，或整体移除改用安装期交互创建（见 docs/m5-atomic.md 决策待定）。
+# =============================================================================
+[[customizations.user]]
+name = "demon"
+password = "123456"
+groups = ["wheel"]
+
+[customizations.services]
+enabled = ["sshd"]

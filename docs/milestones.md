@@ -130,11 +130,30 @@ app=libreoffice，窗口验证 soffice 26.2）→ 通知"。意外收获：给�
 遗留待用户在场复核两项：真实鼠标点选横幅、真人输 polkit 密码（无人值守已分别由 makoctl invoke
 与 ydotool 键盘驱动覆盖信号等价路径）。
 
-## M5 发行
+## M5 发行（进行中 · 已完成 X，2026-10-17 晚）
 
 **目标**：从“我电脑上的配置”变成“别人能装的系统”。
 
-范围：
+**已完成（本里程碑累计，详录 [m5-atomic.md](m5-atomic.md)）**：
+
+- ✅ **Atomic 镜像构建链（aarch64）**：bootc OCI 镜像 `agentos:dev-aarch64`
+  4.43GB/84 层，容器内冒烟全过（Mac 中转 skopeo 方案破 quay 网络阻断，附 A）；
+- ✅ **greenboot 自动回滚接入**：检查脚本 + preset 声明，qemu/Fusion 真实引导
+  验证 healthcheck active、检查通过、grubenv 落盘（§8.1；负路径回滚演示待做）；
+- ✅ **CI 双架构 workflow**：`.github/workflows/build-image.yml`（原生 runner
+  matrix，bootc 含内核必须原生构建）；本地三重静态校验过，**未实跑**（无 remote）；
+- ✅ **bootc-image-builder 产物**：qcow2 2.0GB（sha256 见附 B），预置 demon/wheel
+  + sshd；构建配置与五个踩坑实录入档（附 B）；
+- ✅ **Fusion 点亮**：arm VM 从 vmdk 引导，SDDM（Wayland greeter）active、
+  graphical.target 达成、canvas HTTP 200、goose 1.55.0 在位；VM 保留运行
+  供亲验（附 C；streamOptimized 只读坑已定位并绕开）；
+- ✅ **30 分钟演练**：产物在手 → 可用对话 ≈**11 分钟**（达标；附 D 差距分析）。
+
+**未完成（遗留，见 m5-atomic.md §10 遗留清单）**：x86_64 构建（CI 实跑）、
+ISO 安装介质（bib 类型已换代需实测）、M1 端到端任务在新 VM 重放（需 API key）、
+greenboot 负路径回滚演示、ghostty/镜像终端断层（决策待定 D1/D2，§9）。
+
+范围（原始定义，含未启动项）：
 
 - **Atomic 镜像 PoC（默认方向，ADR-0001）**：基于 Fedora bootc 基础镜像构建 AgentOS OCI 镜像
   （niri + 全组件 + 默认配置），对照 Bazzite 参考实现——host 不可变、原子更新、自动回滚；
@@ -144,6 +163,7 @@ app=libreoffice，窗口验证 soffice 26.2）→ 通知"。意外收获：给�
 - 用户文档与官网/文档站。
 
 退出标准：全新机器 30 分钟内完成安装并跑通 M1 的端到端任务。
+（窗口内实测 11 分钟到「可用对话」；M1 端到端重放待用户 API key 环境。）
 
 ---
 

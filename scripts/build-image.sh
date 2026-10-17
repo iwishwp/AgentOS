@@ -13,8 +13,11 @@
 #   --no-cache  podman build --no-cache（调试层缓存问题时用）
 #
 # 环境变量：
-#   AGENTOS_VM         Mac→VM 模式的 ssh 目标（默认 agentos-vm）
+#   AGENTOS_VM          Mac→VM 模式的 ssh 目标（默认 agentos-vm）
 #   AGENTOS_BUILD_JOBS 传 1 可限制并发步骤（3.8G 内存的 VM 构建 OOM 时用）
+#   GOOSE_INSTALL_MODE  设为 build 则透传给 Containerfile（构建期装 goose，
+#                       需构建环境可达 github.com——CI 适用；默认 firstboot）
+#   FEDORA_VERSION      基础镜像大版本（默认 44）
 #
 # x86_64 / CI 说明（本机无 docker/podman，无法交叉验证）：
 #   本脚本在 aarch64 VM 上构建 aarch64 镜像（tag: agentos:dev-aarch64）。
@@ -72,30 +75,41 @@ done
 command -v podman >/dev/null 2>&1 || { echo "错误: 未安装 podman"; exit 1; }
 
 # 1) 预拉基础镜像（网络对 quay.io 的可达性提前暴露；停滞超时 → 重试，见顶部说明）
-echo "== podman pull ${BASE_IMAGE}（最多 ${PULL_ATTEMPTS} 次，单次上限 ${PULL_TIMEOUT}s）=="
-pulled=0
-for i in $(seq 1 "$PULL_ATTEMPTS"); do
-    if timeout "$PULL_TIMEOUT" podman pull --retry 3 "$BASE_IMAGE"; then
-        pulled=1; break
+#    本地 store 已有该 tag 时跳过：oci-archive 灌入的镜像没有 registry digest
+#    标注，podman pull 不认本地缓存会把整镜像重拉一遍（在本项目 VM 上必然
+#    撞 quay 停滞）；podman build 本身会用本地 tag。要强制刷新基座先 rmi 它。
+if podman image exists "$BASE_IMAGE" 2>/dev/null; then
+    echo "== 本地已有 ${BASE_IMAGE}，跳过预拉（刷新请先 podman rmi）=="
+else
+    echo "== podman pull ${BASE_IMAGE}（最多 ${PULL_ATTEMPTS} 次，单次上限 ${PULL_TIMEOUT}s）=="
+    pulled=0
+    for i in $(seq 1 "$PULL_ATTEMPTS"); do
+        if timeout "$PULL_TIMEOUT" podman pull --retry 3 "$BASE_IMAGE"; then
+            pulled=1; break
+        fi
+        echo "pull 第 ${i} 次失败（错误或 ${PULL_TIMEOUT}s 停滞超时）$([[ $i -lt $PULL_ATTEMPTS ]] && echo '，15s 后重试（已完成 blob 有缓存）')"
+        [[ $i -lt $PULL_ATTEMPTS ]] && sleep 15
+    done
+    if [[ $pulled -ne 1 ]]; then
+        echo "错误: ${BASE_IMAGE} 拉取失败（已尝试 ${PULL_ATTEMPTS} 次）。"
+        echo "      本 VM 到 quay.io 网络被阻断——按纪律停止构建，不设代理。"
+        echo "      构建验证转交 CI / x86_64 环境（docs/m5-atomic.md §CI）。"
+        exit 2
     fi
-    echo "pull 第 ${i} 次失败（错误或 ${PULL_TIMEOUT}s 停滞超时）$([[ $i -lt $PULL_ATTEMPTS ]] && echo '，15s 后重试（已完成 blob 有缓存）')"
-    [[ $i -lt $PULL_ATTEMPTS ]] && sleep 15
-done
-if [[ $pulled -ne 1 ]]; then
-    echo "错误: ${BASE_IMAGE} 拉取失败（已尝试 ${PULL_ATTEMPTS} 次）。"
-    echo "      本 VM 到 quay.io 网络被阻断——按纪律停止构建，不设代理。"
-    echo "      构建验证转交 CI / x86_64 环境（docs/m5-atomic.md §CI）。"
-    exit 2
 fi
 
 # 2) 构建（层说明见 os/bootc/Containerfile；内存紧张时 AGENTOS_BUILD_JOBS=1）
+#    --pull=never：基座获取是上面预拉步骤的职责，构建期一律用本地 tag——
+#    oci-archive 灌入的镜像缺 digest 标注时，默认的 --pull=missing 会被误判
+#    「本地缺失」而重撞 registry（本项目 VM 上即 quay 停滞）。
 echo "== podman build → ${IMAGE_TAG} =="
 JOBS_FLAG=()
 [[ -n "${AGENTOS_BUILD_JOBS:-}" ]] && JOBS_FLAG=(--jobs "${AGENTOS_BUILD_JOBS}")
-podman build "${JOBS_FLAG[@]}" "${EXTRA_FLAGS[@]}" \
+podman build --pull=never "${JOBS_FLAG[@]}" "${EXTRA_FLAGS[@]}" \
     -f os/bootc/Containerfile \
     -t "$IMAGE_TAG" \
     --build-arg "FEDORA_VERSION=${FEDORA_VERSION}" \
+    ${GOOSE_INSTALL_MODE:+--build-arg "GOOSE_INSTALL_MODE=${GOOSE_INSTALL_MODE}"} \
     "$REPO_ROOT"
 
 # 3) 产物报告：大小 + 层数（bootc 层 = 更新时的传输/回滚粒度）
@@ -113,9 +127,16 @@ if [[ $SMOKE -eq 1 ]]; then
         echo "npm:       $(npm --version)";
         echo "gsr:       $(rpm -q gpu-screen-recorder)";
         echo "sddm:      $(rpm -q sddm)";
+        echo "greenboot: $(rpm -q greenboot)";
         echo "canvas:    $(node --check /usr/share/agentos/packages/canvas/dist/index.js && echo syntax-ok)";
         echo "defaults:  $(ls /usr/share/agentos/defaults/niri/)";
         echo "user-units:$(ls /usr/lib/systemd/user/ | grep agentos | tr "\n" " ")";
+        echo "gb-checks: $(ls /usr/lib/greenboot/check/required.d/ | tr "\n" " ")";
+        # greenboot 检查脚本在容器内直接跑一遍（此时 wants 链接已随 enable 落盘，
+        # 两个脚本都应返回 0；真实启动编排属磁盘引导验证，容器内无法覆盖）
+        for s in /usr/lib/greenboot/check/required.d/*.sh; do
+            "$s" && echo "gb-run:    $s -> 0" || echo "gb-run:    $s -> FAILED($?)";
+        done
     '
 fi
 

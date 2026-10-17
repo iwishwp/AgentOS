@@ -34,10 +34,17 @@ credential-broker（守护进程，持有解锁会话/集成了 1Password 桌面
 Secret Service / gnome-keyring / Bitwarden / KeePassXC / 1Password
 ```
 
-### 通道 A：自动填充（网页登录类，推荐默认）
+### 通道 A：自动填充（网页登录类，推荐默认）——✅ 已实现（cred_autofill，2026-10-17 VM 实测）
 
-1Password/Bitwarden 桌面端自带的 autofill 直接填充到目标窗口；agent 只发起
-“请在窗口 X 填充 vault://…/login”请求并等待完成信号。填充过程对 agent 不可见。
+实现走 **CDP 注入**而非密码管理器桌面端（1Password 桌面端 autofill 留作增强后端）：broker 取明文
+→ 经 browser-mcp 的 CDP 连接在目标页面 `open(url)` → 页面内设值 + 派发 input/change 事件 →
+**页面内逐字节复核**（`el.value === 注入值`，matches 布尔回传，明文不出页面）→ 回执只含
+**长度 + sha256**（安全上下文页面内算；data: URL 等非安全上下文无 crypto.subtle，由 broker 用
+同一明文补算——值不出 broker 栈帧，零明文纪律不变）。matches=false（被框架改写）一律拒绝。
+实测：水族馆 Chromium 填 data: URL 测试页，回执 sha256 与 orchestrator 管道内独立计算逐字节一致。
+
+1Password/Bitwarden 桌面端自带的 autofill 直接填充到目标窗口是同通道的后续载体（agent 只发起
+“请在窗口 X 填充 vault://…/login”请求并等待完成信号，填充过程对 agent 不可见）。
 
 ### 通道 B：代为执行（CLI/命令类）——✅ 已实现（cred-mcp，2026-10-17）
 
@@ -53,11 +60,15 @@ curl 带 token 等）由 broker 代为起进程，secret 经 stdin 或 broker �
 **子进程**，agent 只拿到进程的 stdout/stderr/退出码。等价于“agent 说要做什么，
 broker 替它做需要钥匙的那一步”。
 
-### 通道 C：短期凭据注入（必须 agent 进程自己调用的场景）
+### 通道 C：短期凭据注入（必须 agent 进程自己调用的场景）——✅ 已实现（cred_inject，2026-10-17 实测）
+
+broker 起 wrapper 进程并注入短期凭据 env，TTL 到点收割整个进程组（实测 sleep 60 + ttl 3 →
+3.2s 被杀、exit 124、stderr 标记 AGENTOS_EXPIRED=1）；token 不出现在命令行、不进入 agent 上下文、
+过期自动失效——凭据有效期即进程有效期。
 
 少数场景 agent 起的进程必须持有凭据（如 OAuth 短期 token）。broker 换取**短 TTL、
-最小权限**的 token，注入到 broker 起的 wrapper 进程 env；token 不出现在命令行、
-不进入 agent 上下文、过期自动失效。
+最小权限**的 token，注入到 broker 起的 wrapper 进程 env（原设计语义，v1 以 credentials.yaml
+的 `ttl_seconds` 参数按次注入实现）。
 
 ## 3. 后端选择：Secret Service 为底座，1Password 为增强
 
@@ -77,18 +88,19 @@ agent 工具面只认引用。
 ```yaml
 # ~/.config/agentos/credentials.yaml（示意）
 vault://bank/login:
-  allow: autofill          # A/B/C 通道白名单
-  scope: [browser]         # 哪些工具/应用可用
-  confirm: session         # always | session | once
+  allow: autofill          # A/B/C 通道白名单（单值或数组：autofill/execute/inject）
+  exec_allow: [python3, sleep]   # 通道 B 的命令白名单（argv[0] 精确匹配）
 vault://github/token:
   allow: [execute, inject]
-  scope: [git, gh]
-  confirm: once            # 授权一次后本策略长期有效
+  exec_allow: [git, gh]
 ```
 
-- `confirm: always` 每次弹窗；`session` 每次登录会话问一次；`once` 授权即记住；
-- 所有授予/使用事件进审计日志（M4 的审计体系共用）；
-- 撤销入口：设置面板一键吊销任意引用的授权。
+- `exec_allow` 是通道 B 的硬白名单（数组直 spawn、无 shell，argv[0] 必须命中）；
+  未开放通道的引用直接拒绝（不触碰 secret-tool）；
+- **v1 落地取舍**：`scope`/`confirm` 两键暂未实现——工具级确认由 policy 网关统一承担
+  （cred_exec/cred_autofill/cred_inject 在 policy.yaml 配 confirm 档，见 permissions.md §3），
+  引用级粒度待 portal 权限库落地时补；
+- 所有授予/使用事件进审计日志（M4 的审计体系共用，实测 185 行审计明文扫描零命中）；
 
 ## 5. 与其他模块的关系
 
@@ -126,3 +138,6 @@ Cookie，钥匙环未解锁 → 弹 "Unlock login Keyring" 对话框 → **网�
 ## 变更记录
 
 - 2026-10-12 v0.1 初稿：broker 三通道架构、后端选型、权限策略模型。
+- 2026-10-17 v0.2 M4 落地：三通道全部实现并 VM 实测（A：CDP 填充+matches 复核+broker 端补算哈希；
+  B：白名单代执行哈希严格一致；C：TTL 收割 3.2s 实证）；§4 policy 模型按实现修订
+  （exec_allow 硬白名单、scope/confirm 归并到 policy 网关）；全量审计零明文扫描通过。

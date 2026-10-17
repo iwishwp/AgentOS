@@ -11,7 +11,7 @@
 | **M1** | 系统工具面 | 2–4 周 | ✅ 纯对话完成“下载→整理→生成文档→调起 LibreOffice”（2026-10-15 达成） |
 | **M2** | 呈现层 | 3–4 周 | 任务产物统一进 artifacts 可回看；双通道呈现可用 |
 | **M3** | agent 会话 | 4–6 周 | ✅ 独立会话完成真实表单提交 + GUI 应用操作，零干扰（2026-10-16 达成） |
-| **M4** | 信任与安全 | 3–4 周 | 凭据零明文进上下文；误操作可回滚、可回放 |
+| **M4** | 信任与安全 | 3–4 周 | ✅ 凭据零明文进上下文；误操作可回滚、可回放（2026-10-17 达成） |
 | **M5** | 发行 | 2–4 周 | 全新机器 30 分钟从 ISO/脚本到可用对话 |
 
 ---
@@ -97,25 +97,38 @@ app=libreoffice，窗口验证 soffice 26.2）→ 通知"。意外收获：给�
 
 退出标准：agent 在独立 GUI 会话完成一个真实网页表单提交 + 一个仅有 GUI 的应用操作，全程不干扰用户正在做的事。（GUI 应用操作部分已达成，表单部分待浏览器自动化接入）
 
-## M4 信任与安全
+## M4 信任与安全 ✅（2026-10-17 退出标准达成，实测详录 real-machine.md 当日条目）
 
 **目标**：把”敢把电脑交给 agent”变成产品能力。
 
-范围：
+范围（全部落地）：
 
-- **credential broker**（详见 [security/credentials.md](security/credentials.md)）：Secret Service（libsecret/gnome-keyring，兼容 Bitwarden/KeePassXC）为底座，1Password（CLI/Shell Plugins 模式）为增强；agent 拿能力不拿明文——**通道 B（代执行）已实现并实证**（cred-mcp：白名单代执行 + 输出打码，2026-10-17 哈希严格一致、偷看拦截、审计零明文）；通道 A（自动填充）/C（短期注入）待做；
-- **Keyring 自动解锁（✅ 2026-10-17 验收通过）**：注销重登实测——PAM 拉起单实例 daemon、secret-tool 写入探针瞬时成功、零弹窗（方案与实测详录 credentials.md §5.1）；
-- 权限分级 v1：portal/polkit 集成，确认粒度“每次/仅此一次/永不”——**设计已定稿**（三档映射/policy.yaml
-  逐档示例/pkexec 装包确认路径，见 [permissions.md](permissions.md)），实现待做；
-- 审计日志：agent 全部工具调用结构化落盘；
+- **credential broker ✅ 三通道齐装**（详见 [security/credentials.md](security/credentials.md)）：Secret Service
+  （libsecret/gnome-keyring）为底座；agent 拿能力不拿明文——**A 自动填充**（CDP 页面内设值 + 逐字节
+  matches 复核 + 只回长度/sha256，非安全上下文 broker 端补算）、**B 代执行**（白名单 + 输出打码，
+  哈希严格一致实证）、**C 短期注入**（TTL 收割实测 3.2s）——2026-10-17 VM 六场景冒烟全过，
+  全量审计明文扫描零命中；
+- **Keyring 自动解锁（✅ 2026-10-17 验收通过）**：注销重登实测——PAM 拉起单实例 daemon、
+  secret-tool 写入探针瞬时成功、零弹窗（方案与实测详录 credentials.md §5.1）；
+- **权限分级 v1 ✅**：`@agentos/policy` 决策值 confirm + 六个 server 统一策略网关 +
+  `org.agentos.Confirm1` D-Bus 服务（T1 确认流五条应答路径实测：allow_once/allow_session/
+  deny_once/always_deny/30s 超时；always_deny 写回 policy.yaml 实证；拒绝后不执行实证）；
+  T2 走 pkexec 专用 helper + polkit 强认证 + 装前只读快照（`system.package_install` 全链 VM 实测）。
+  载体决策：Fedora mako 1.11 不渲染动作按钮 → 每个选择一条横幅、点击即选（见 permissions.md §4.1 修订）；
+- **审计日志 ✅**：全部工具调用结构化落盘（tier/confirm/snapshot 扩字段），canvas `/api/audit`
+  暴露 + `/replay` 时间轴页渲染实测（186 条真实事件）；
 - 会话录屏与回放：gpu-screen-recorder 录 agent 会话——**v1 已落地并 VM 实测**（`scripts/record-session.sh`
   录水族馆输出；gsr 调研结论：其 KMS/portal 架构只能录物理屏，不能只录嵌套会话，故水族馆走 grim|ffmpeg
   通道，gsr 留作整屏场景；详见 [session-recording.md](session-recording.md)）；
-- snapper 快照钩子：系统级变更前自动快照 + 一键回滚（“撤销 agent 的操作”）——**脚本与 root 配置已落地
-  并 VM 实测**（`scripts/snapshot.sh` + [os/snapper/README.md](../os/snapper/README.md)：手动/钩子触发、
-  无定时、只读快照；与 dnf 的自动串联待权限分级落地后接）。
+- **snapper 快照钩子 ✅ 与 T2 自动串联**：装包 helper 装前强制只读快照（无快照不安装）；
+  回滚演示完成——审计时间轴定位误操作 → 快照启动实证回滚态 → 撤销落定（本机 fstab/rootflags
+  钉死 subvol 的限制与无人值守路径见 real-machine.md；永久化提升指向 M5 bootc/atomic）。
 
-退出标准：任何密码类操作零明文进入 agent 上下文与日志；演示一次误操作的回滚与回放。
+退出标准 ✅：**零明文**——密码类操作（凭据三通道、polkit 认证）实测明文不进 agent 上下文与日志
+（审计 grep 零命中；认证框密码由 ydotool 键盘直输 GUI，不经过 agent）；**回滚与回放**——
+"agent 误装包 → /replay 时间轴定位 → 快照回滚（sl 实证消失）→ 撤销落定"全程命令与输出留证。
+遗留待用户在场复核两项：真实鼠标点选横幅、真人输 polkit 密码（无人值守已分别由 makoctl invoke
+与 ydotool 键盘驱动覆盖信号等价路径）。
 
 ## M5 发行
 

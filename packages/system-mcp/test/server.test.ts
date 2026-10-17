@@ -23,7 +23,7 @@ function textOf(result: { content: unknown }): string {
 }
 
 describe("MCP 工具面", () => {
-  it("注册 7 个只读工具", async () => {
+  it("注册 7 个只读工具 + 1 个 T2 装包工具", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       "journal",
@@ -31,6 +31,7 @@ describe("MCP 工具面", () => {
       "list_services",
       "network_info",
       "package_info",
+      "package_install",
       "service_status",
       "system_status",
     ]);
@@ -64,5 +65,61 @@ describe("MCP 工具面", () => {
     });
     expect(r.isError).toBe(true);
     expect(runner.calls).toHaveLength(0);
+  });
+});
+
+describe("package_install（T2 装包链）", () => {
+  it("成功：pkexec helper 直传包名，回复含快照号与回滚指引", async () => {
+    runner.on(["/usr/libexec/agentos/pkg-install", "cowsay"], {
+      stdout: "AGENTOS_SNAPSHOT=42\n已安装。\n",
+    });
+    const r = await client.callTool({
+      name: "package_install",
+      arguments: { packages: ["cowsay"] },
+    });
+    expect(textOf(r)).toContain("快照 #42");
+    expect(textOf(r)).toContain("snapshot.sh rollback 42");
+    // 直传：argv 为 [helper, 包名]，无 shell 拼接
+    expect(runner.last()!.cmd).toBe("pkexec");
+    expect(runner.last()!.args).toEqual(["/usr/libexec/agentos/pkg-install", "cowsay"]);
+  });
+
+  it("失败：isError + 回滚指引", async () => {
+    runner.on(["/usr/libexec/agentos/pkg-install", "no-such-pkg"], {
+      stdout: "AGENTOS_SNAPSHOT=43\n",
+      stderr: "没有匹配的包",
+      code: 1,
+    });
+    const r = await client.callTool({
+      name: "package_install",
+      arguments: { packages: ["no-such-pkg"] },
+    });
+    expect(r.isError).toBe(true);
+    expect(textOf(r)).toContain("snapshot.sh rollback 43");
+  });
+
+  it("带选项/元字符的包名被拒（防 dnf 选项注入）", async () => {
+    for (const bad of ["--config=/tmp/x", "a;b", "../escape", "-v"]) {
+      const r = await client.callTool({
+        name: "package_install",
+        arguments: { packages: [bad] },
+      });
+      expect(r.isError, `包名 ${bad} 应被拒绝`).toBe(true);
+    }
+    expect(runner.calls.filter((c) => c.cmd === "pkexec")).toHaveLength(0);
+  });
+
+  it("审计含快照号", async () => {
+    const fs = await import("node:fs");
+    const auditPath = "/tmp/agentos-test-audit.jsonl";
+    fs.rmSync(auditPath, { force: true });
+    runner.on(["/usr/libexec/agentos/pkg-install", "sl"], {
+      stdout: "AGENTOS_SNAPSHOT=77\n",
+    });
+    await client.callTool({ name: "package_install", arguments: { packages: ["sl"] } });
+    const lines = fs.readFileSync(auditPath, "utf8").trim().split("\n");
+    const resultEntry = lines.map((l) => JSON.parse(l)).find((e) => e.snapshot === "77");
+    expect(resultEntry).toBeDefined();
+    expect(resultEntry.tool).toBe("package_install");
   });
 });

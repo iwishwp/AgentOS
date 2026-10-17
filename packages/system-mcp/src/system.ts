@@ -130,3 +130,51 @@ function assertUnitName(name: string): void {
     throw new SystemError(`非法名称: ${name}（只允许字母数字与 @._+- 字符）`);
   }
 }
+
+export interface InstallResult {
+  code: number | null;
+  stdout: string;
+  stderr: string;
+  /** 装包前创建的 snapper 快照编号（helper 输出 AGENTOS_SNAPSHOT=N） */
+  snapshot?: string;
+}
+
+/**
+ * T2 装包链（permissions.md §4.2）：pkexec 专用 helper（快照 + dnf install 都在 root 侧）。
+ *
+ * 设计决策（对 §4.2 的一个修订，见 permissions.md）：快照收进 helper 而非 server 侧执行——
+ * server 是非交互进程，`sudo snapper` 无密码通道；收进 helper 还让"快照→安装"原子化
+ * （快照失败即中止，不存在无快照的安装窗口）。审计仍含快照号（解析 helper stdout）。
+ */
+export class PackageInstaller {
+  private readonly pkexec: string;
+  private readonly helper: string;
+
+  constructor(
+    private readonly runner: CommandRunner,
+    opts: { pkexec?: string; helper?: string } = {},
+  ) {
+    this.pkexec = opts.pkexec ?? process.env["AGENTOS_PKEXEC_BIN"] ?? "pkexec";
+    this.helper = opts.helper ?? process.env["AGENTOS_PKG_INSTALL_HELPER"] ?? "/usr/libexec/agentos/pkg-install";
+  }
+
+  async install(packages: string[]): Promise<InstallResult> {
+    if (packages.length === 0) {
+      throw new SystemError("packages 不能为空");
+    }
+    for (const p of packages) {
+      // 与 helper 同款校验：包名（含 NEVRA 分隔符），绝不允许选项/路径/元字符
+      if (!/^[a-zA-Z0-9][a-zA-Z0-9._+-]{0,200}$/.test(p)) {
+        throw new SystemError(`非法包名: ${p}（只允许字母数字与 ._+- 字符，且不得以 - 开头）`);
+      }
+    }
+    const r = await this.runner.run(this.pkexec, [this.helper, ...packages]);
+    const snap = /AGENTOS_SNAPSHOT=(\d+)/.exec(r.stdout);
+    return {
+      code: r.code,
+      stdout: r.stdout,
+      stderr: r.stderr,
+      snapshot: snap?.[1],
+    };
+  }
+}

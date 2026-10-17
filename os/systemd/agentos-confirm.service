@@ -1,0 +1,19 @@
+# AgentOS 确认服务（org.agentos.Confirm1，权限模型 v1 的 T1 通道）
+# 安装：
+#   cp agentos-confirm.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now agentos-confirm
+# 自检：gdbus call --session --dest org.agentos.Confirm1 --object-path /org/agentos/confirm \
+#         --method org.freedesktop.DBus.Peer.Ping
+[Unit]
+Description=AgentOS confirm service (org.agentos.Confirm1, mako action notifications)
+After=graphical-session.target
+PartOf=graphical-session.target
+# mako（通知守护进程）可能晚于本服务启动，Notify 失败会重试由调用方超时兜底
+
+[Service]
+ExecStart=/usr/bin/python3 %h/AgentOS/os/dbus/agentos-confirm.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical-session.target

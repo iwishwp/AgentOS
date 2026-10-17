@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AgentOS T2 装包 action（permissions.md §4.2）。
+  部署：sudo install -D -m 0644 org.agentos.pkg-install.policy \
+          /usr/share/polkit-1/actions/org.agentos.pkg-install.policy
+
+  任何到达路径都要求 admin 密码（auth_admin）：
+  - allow_active：图形会话内（pkexec 的 org.freedesktop.policykit.exec 由 rules.d 改写，此项兜底）；
+  - allow_any：goose/systemd user service 等"无 logind 会话"的调用方（生产路径）；
+  - allow_inactive：非活跃会话。
+  auth_admin 不保留凭证——每次装包都要重新输密码（"每次都问"）。
+-->
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <action id="org.agentos.pkg-install">
+    <description>AgentOS: 安装软件包（agent 发起，用户强确认）</description>
+    <description xml:lang="en">AgentOS: install packages (agent-initiated, strong user confirmation)</description>
+    <message>认证以允许 agent 通过 AgentOS 装包 helper 安装软件包（装前自动创建快照）</message>
+    <message xml:lang="en">Authentication is required to let the agent install packages via the AgentOS helper (a snapshot is taken first)</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/agentos/pkg-install</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+</policyconfig>

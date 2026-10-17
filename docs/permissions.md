@@ -1,8 +1,8 @@
-# 权限分级 v1（M4）
+# 权限分级 v1（M4 ✅）
 
-> 状态：设计文档（2026-10-17）。定义三档权限如何映射到现有 `@agentos/policy`（allow/deny）
-> 与未来的 portal 确认流；给出全部现有扩展的逐档建议与 polkit/portal 集成方案。
-> 本文只定方案与示例配置，不含实现代码。
+> 状态：**已实现并 VM 实测（2026-10-17）**——policy confirm 决策 + 六 server 统一网关 +
+> org.agentos.Confirm1 服务（T1）+ pkexec/polkit 装包链（T2）；本文保留三档设计论述，
+> 载体与集成细节按实测修订（标"修订"处）。原始设计定稿于 2026-10-17 早间。
 
 ## 1. 三档定义
 
@@ -106,25 +106,39 @@ rules:
 
 ## 4. portal / polkit 集成方案
 
-### 4.1 T1 的确认流（portal 式）
+### 4.1 T1 的确认流（portal 式）——✅ 已实现（载体按实测修订）
 
 v1 不强求进 xdg-desktop-portal 官方树，先做一个**用户级 D-Bus 确认服务**（portal 的同构前身）：
 
 ```text
 D-Bus: org.agentos.Confirm1 /org/agentos/confirm
   Request(s: agent, s: tool, s: summary_redacted, s: tier) → (u: req_id)
-  Respond(u: req_id, s: choice)      # allow_once | allow_session | deny_once | always_deny
+  Respond(u: req_id, s: choice) → (b: ok)   # 编程应答；allow_once | allow_session | deny_once | always_deny
+  Wait(u: req_id, i: timeout_ms) → (s: choice, s: by, u: elapsed_ms)
   信号: Confirmed(u: req_id, s: choice, s: by)
 ```
 
-- 通知载体：mako 动作通知（"允许 / 本次会话允许 / 拒绝 / 永不"），30 秒超时 = `deny_once`；
+- **通知载体（修订：mako 1.11 无动作按钮）**：原设计"一条通知带 4 个按钮"不可行——
+  Fedora mako 1.11 实测 actions 选项只控制整条通知的默认动作、不渲染按钮。改为
+  **一个选择一条横幅**：服务倒序发四条 critical 横幅（critical 不自动过期，超时由服务统一
+  CloseNotification 收走），mako 新者在顶，最终自上而下读作 允许/会话允许/拒绝/永不。
+  NotificationClosed 不视为决定（横幅收起≠表态），只有点选（ActionInvoked）或 Respond 算数；
+  30 秒超时 = deny_once。
+- **再修订（虚拟指针下的命中测试边界，2026-10-17）**：mako 1.11 对"识别点击的是哪条通知"
+  的命中测试在虚拟指针（ydotool）下不生效——dismiss-all 可触发，但 invoke-default-action /
+  exec / 单条 dismiss（都需定位具体通知）无动作。T1 选择应答经 `makoctl invoke -n <横幅id>
+  default` 驱动：它发射与真实点击**完全相同**的 ActionInvoked 信号（服务端 by=notify-action
+  无法区分）。真实鼠标能否直接点选横幅待用户在场复核；排查过程与 ydotool 三坑
+  （socket 路径 / 负参形式 / 低速加速系数）详录 real-machine.md M4 条目与
+  `scripts/t1-click-drive.sh` 头注释。
 - MCP server 侧：policy.decide 返回 `confirm` → 调 `Request` → 阻塞等待信号 →
-  批准则执行，`allow_session` 记入内存表，`always_deny` 写回 policy.yaml；
-- 全程审计（含用户按了什么、几秒响应）；
+  批准则执行，`allow_session` 记入内存表，`always_deny` 写回 policy.yaml（实测：写回
+  `rules.<ext>.<tool>=deny` 并即时生效于本进程）；五条应答路径（四 choice + 超时）VM 全实测；
+- 全程审计（含用户按了什么、几秒响应——`confirm: {asked, result, by, response_ms}` 扩字段）；
 - 迁移路径：接口对齐 xdg-desktop-portal 的 Request/Response 模式，未来可平移为
   自定义 portal backend，与 ScreenCast/FileChooser 同列。
 
-### 4.2 T2 的强确认（polkit：dnf 装包确认的实现路径）
+### 4.2 T2 的强确认（polkit：dnf 装包确认）——✅ 已实现（os/polkit/ + system-mcp）
 
 dnf 不走 polkit，agent 也不该直接 sudo。推荐路径 **pkexec + 专用 helper**：
 
@@ -146,15 +160,31 @@ polkit 配置（`/usr/share/polkit-1/actions/org.agentos.pkg-install.policy` + r
 ```
 
 ```javascript
-// /etc/polkit-1/rules.d/49-agentos.rules —— helper 只能是白名单路径，其余 pkexec 一律拒绝
+// /etc/polkit-1/rules.d/49-agentos.rules —— 实际部署版（os/polkit/49-agentos.rules）
 polkit.addRule(function (action, subject) {
   if (action.id == "org.freedesktop.policykit.exec") {
     var program = action.lookup("program");
-    if (program == "/usr/libexec/agentos/pkg-install" && subject.local && subject.active)
-      return polkit.Result.AUTH_ADMIN;      // 密码确认，不记住（每次都问）
+    if (program == "/usr/libexec/agentos/pkg-install") {
+      return polkit.Result.AUTH_ADMIN;   // 密码确认，不记住（每次都问）
+    }
+    if (program !== undefined) {
+      return polkit.Result.NO;           // 其余 pkexec 一律拒绝
+    }
   }
 });
 ```
+
+> **修订（2026-10-17 实测）**：上版规则要求 `subject.local && subject.active`——实机上
+> goose（systemd user service / 无 logind 会话）与远程 SSH 驱动的调用方 local/active 均为
+> false，规则直接落空。改为**不要求 local/active**：`auth_admin` 本身仍需 admin 密码，
+> 认证强度不降级，只是允许这些调用方**走**强认证；真正的防线是 helper 路径白名单 +
+> 包名校验 + 装前快照。另两个实测发现（详录 real-machine.md）：
+> ① 认证框由**图形会话里注册的 polkit 代理**（lxqt-policykit-agent，niri 自启，带
+> `QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1`）承接——调用方不在图形会话时框仍弹出，
+> 但自动化须在会话内驱动（ydotool 键盘直输，认证框弹出即聚焦）；
+> ② **packagekitd 会抢 rpm 锁**（装包偶发失败的根因），helper 链路前需
+> `systemctl stop packagekit`；**F44 pkexec 在子进程退出后挂死**（pidfd 等待不再触发），
+> 工具侧应给 pkexec 包超时（当前 kill 后审计如实记 exit=null）。
 
 备选路径（同一 T2 语义的两种载体）：
 
@@ -170,11 +200,14 @@ T2 批准链 = `snapshot create → pkexec 确认 → 执行 → 审计(含快�
 一次误操作从"发现 → 看回放定位 → 快照回滚"全程有据可查——这就是 M4 退出标准
 "演示一次误操作的回滚与回放"的拼图。
 
-## 5. 落地顺序建议
+## 5. 落地顺序（✅ 1–4 已完成，2026-10-17）
 
-1. policy v1：decision 增加 `confirm` + 审计扩字段（改动集中在 policy.ts，全部 server 免改——
-   拒绝/放行逻辑不变，confirm 由 server.ts 的统一包装层处理）；
-2. org.agentos.Confirm1 D-Bus 服务 + mako 动作通知（T1 可用）；
-3. T0/T1 全量工具按 §3 表迁移 defaults；
-4. pkg-install helper + polkit action/rules + snapshot 串联（T2 可用，M4 演示项）；
+1. ~~policy v1：decision 增加 `confirm` + 审计扩字段~~（✅ policy.ts/confirm.ts/gate.ts，
+   全部 server 经 createGate 统一接入，免改各工具实现）；
+2. ~~org.agentos.Confirm1 D-Bus 服务 + mako 确认通知（T1 可用）~~（✅ os/dbus/agentos-confirm.py，
+   载体按 §4.1 修订为四横幅）；
+3. ~~T0/T1 全量工具按 §3 表迁移 defaults~~（✅ VM policy.yaml 按 §3 部署实测）；
+4. ~~pkg-install helper + polkit action/rules + snapshot 串联（T2 可用，M4 演示项）~~
+   （✅ os/polkit/ 三件套 + PackageInstaller，快照收进 helper 原子化——快照失败即中止，
+   不存在无快照的安装窗口）；
 5. xdg-desktop-portal backend 化（对外标准化，M5 前不急）。

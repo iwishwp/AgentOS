@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# /usr/libexec/agentos/pkg-install —— AgentOS T2 装包 helper（经 pkexec 以 root 运行）。
+#
+# 部署（root:root 0755，路径固定——pkexec 只认白名单程序路径）：
+#   sudo install -D -m 0755 -o root -g root pkg-install /usr/libexec/agentos/pkg-install
+#
+# 安全模型（permissions.md §4.2）：
+#   - 参数只接受包名（^[a-zA-Z0-9][a-zA-Z0-9._+-]*$），拒绝一切选项/路径/元字符——
+#     dnf 的配置/仓库注入面（--config、--setopt、@group、rpm URL）全部封死；
+#   - 无 shell 数组重建、无通配：exec dnf install -y "$@"，参数边界原样传递；
+#   - 安装前先建只读 snapper 快照（agentos-pre-dnf-*），快照失败即中止——
+#     不存在"无快照的安装窗口"；快照号经 AGENTOS_SNAPSHOT=N 且回给调用方审计。
+set -euo pipefail
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo "本 helper 须以 root 运行（经 pkexec）" >&2
+  exit 2
+fi
+if [ $# -lt 1 ]; then
+  echo "用法: pkg-install <包名...>" >&2
+  exit 2
+fi
+for pkg in "$@"; do
+  if ! [[ "$pkg" =~ ^[a-zA-Z0-9][a-zA-Z0-9._+-]{0,200}$ ]]; then
+    echo "非法包名: $pkg（只允许字母数字与 ._+- 字符，且不得以 - 开头）" >&2
+    exit 2
+  fi
+done
+
+DESC="dnf-$(printf '%s,' "$@" | tr -d '/' | cut -c1-120)"
+if ! NUM=$(snapper -c root create -p --read-only -d "agentos-pre-${DESC}" 2>/dev/null); then
+  echo "AGENTOS_SNAPSHOT_ERROR=1" >&2
+  echo "快照创建失败——按安全策略中止安装（检查 snapper root 配置）" >&2
+  exit 3
+fi
+echo "AGENTOS_SNAPSHOT=${NUM}"
+echo "已创建兜底快照 #${NUM}（agentos-pre-${DESC}）"
+
+if dnf install -y "$@"; then
+  echo "AGENTOS_RESULT=0"
+else
+  RC=$?
+  echo "AGENTOS_RESULT=${RC}"
+  exit "$RC"
+fi

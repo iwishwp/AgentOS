@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { Policy, audit } from "@agentos/policy";
+import { Policy, ConfirmClient, createGate, summarizeArgs } from "@agentos/policy";
 import { FilesError, Workspace } from "./workspace.js";
 
 type ToolOk = { content: [{ type: "text"; text: string }] };
@@ -24,20 +24,15 @@ const relPath = z.string().min(1).describe("相对工作区根目录的路径（
 export function buildServer(ws = new Workspace(), policy: Policy = Policy.load()): McpServer {
   const server = new McpServer({ name: "files-mcp", version: "0.1.0" });
 
-  // 统一注册入口：先过策略（allow/deny + 审计），再进 handler
+  // 统一注册入口：先过策略（allow/deny/confirm + 审计 + T1 确认流），再进 handler
   const EXT = "files";
-  const t = ((name: string, config: Parameters<McpServer["registerTool"]>[1], cb: any) =>
-    server.registerTool(name, config, async (args: unknown) => {
-      const verdict = policy.decide(EXT, name);
-      audit({ ts: new Date().toISOString(), extension: EXT, tool: name, decision: verdict.decision });
-      if (verdict.decision === "deny") {
-        return {
-          content: [{ type: "text" as const, text: `策略拒绝 ${EXT}.${name}（${verdict.reason}）。可在 ~/.config/agentos/policy.yaml 调整。` }],
-          isError: true,
-        };
-      }
-      return cb(args);
-    })) as McpServer["registerTool"];
+  const t = createGate({
+    server,
+    extension: EXT,
+    policy,
+    confirm: new ConfirmClient(),
+    summary: (_tool, args) => summarizeArgs(args),
+  }) as McpServer["registerTool"];
 
   t(
     "list_dir",

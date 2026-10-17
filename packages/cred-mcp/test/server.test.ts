@@ -37,9 +37,9 @@ function textOf(r: { content: unknown }): string {
 }
 
 describe("MCP 工具面", () => {
-  it("注册 2 个工具", async () => {
+  it("注册 4 个工具", async () => {
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(["cred_exec", "cred_list"]);
+    expect(tools.map((t) => t.name).sort()).toEqual(["cred_autofill", "cred_exec", "cred_inject", "cred_list"]);
   });
 
   it("cred_exec 全链路：注入/打码/返回", async () => {

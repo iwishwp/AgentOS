@@ -19,6 +19,10 @@
 // 通知守护进程（desktop-mcp 的通知工具依赖它）
 spawn-at-startup "mako"
 
+// polkit 认证代理（M4 T2 装包链的密码弹窗；QT_LINUX_ACCESSIBILITY_ALWAYS_ON
+// 让 atspi 桥可驱动认证框——实测 Qt6 默认不开无障碍树，2026-10-17）
+spawn-at-startup "env" "QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1" "/usr/libexec/lxqt-policykit-agent"
+
 // 状态栏/桌面 shell（Noctalia v4.7.1 + AgentOS 兼容补丁；安装见 scripts/install-noctalia.sh，
 // 版本论证见 docs/noctalia.md。waybar 配置保留在 os/configs/waybar/ 作为回退）
 spawn-at-startup "qs" "-c" "noctalia"

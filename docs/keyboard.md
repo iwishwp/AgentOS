@@ -63,10 +63,32 @@ niri 配置里的 `Super`（及 `Mod`，在 TTY 会话中 Mod 即 Super）物理
 | 锁屏（swaylock） | `Super+Ctrl+L` | spawn swaylock | ✅ Super+Ctrl+L（Lock system） |
 | 锁屏（别名） | `Super+Alt+L` | 同上 | ➖ niri 官方建议键位 |
 | 退出 niri（有确认对话框） | `Mod+Shift+E` / `Ctrl+Alt+Delete` | quit | ➖ niri 默认（Omarchy 的 Super+Escape 系统菜单未采纳，见 §4） |
-| 键位速查浮层 | `Mod+Shift+/`（即 Super+?）/ `Super+K` | show-hotkey-overlay | ➖ + ✅ Super+K（Keybindings） |
+| **键位速查页**（canvas /keys） | `Super+K` | spawn chromium-browser --app=…/keys | 🔧 Super+K（Keybindings）→ 换实现，见 §2.1 |
+| 键位速查（内置浮层兜底） | `Mod+Shift+/`（即 Super+?） | show-hotkey-overlay | ➖ niri 默认 |
 
 > 截图默认保存到 `~/Pictures/Screenshots/` 并同时进入剪贴板（`screenshot-path` 可改）。
 > 锁屏需要安装 swaylock：`sudo dnf install swaylock`（Arch 系：`sudo pacman -S swaylock`）。
+
+### 2.1 键位速查页（Super+K）
+
+`Super+K` 不再打开 niri 内置 hotkey overlay，而是弹出 canvas 服务的键位速查页
+（`http://127.0.0.1:7788/keys`，chromium `--app` 应用窗口）：
+
+- **整页上下滚动**——Omarchy 心智：键位多于一屏是常态，翻页看；
+- **分组吸顶**——配置 binds 段里的 `// ==== 分组 ====` 注释即页面分组，滚到哪
+  节、节标题钉在视口顶部；
+- **输入即过滤**——右上过滤框，`/` 聚焦、`Esc` 清空，按功能/动作/键位子串筛；
+- **数据零副本**——页面经 `/api/keys` 实时解析 `~/.config/niri/config.kdl` 的
+  binds 段，改键位本页自动跟随，不存在第二份键位表要维护；
+- **系统配色**——CSS 变量取自 Noctalia 色板 `~/.config/noctalia/colors.json`
+  （莫兰迪），换系统配色页面跟着换；色板文件缺失时降级到内置同值缺省色板。
+
+实现：`packages/canvas` 的 keys 模块（`/api/keys` + `/keys`）。路径可用环境变量
+覆盖：`AGENTOS_NIRI_CONFIG`（键位数据源）、`AGENTOS_COLORS_JSON`（色板）。
+`Mod+Shift+/` 保留 niri 内置 overlay，作 canvas 服务不可用时的兜底。
+
+> 实测注记（2026-10-17，VM）：chromium 首次启动建 profile 时可能一次性弹两个
+> 相同窗口（首启现象），再按一次即单窗；日常使用无感。
 
 ## 3. Mac + VMware Fusion 用户注意事项
 
@@ -103,6 +125,7 @@ Fusion 里 ⌘ 会被当作 Super 发进虚拟机，但 **macOS 自己先截获�
 | **Super+Tab vs macOS ⌘Tab（应用切换）** | 非全屏且未关 Mac Host Shortcuts 时 ⌘Tab 到不了 VM（被 Dock 切换器吃掉）。缓解：全屏使用 / 关 Mac Host Shortcuts / 用 `Mod+U`、`Mod+I` 别名切工作区 |
 | **Omarchy Super+Escape（系统菜单）** | 未采纳。niri 没有 power-off-menu 类系统菜单动作（wiki 核对），退出走 `Mod+Shift+E`（quit 自带确认）；Super+Escape 键位留给 niri 默认的"快捷键抑制逃生门" |
 | **Omarchy Super+T（平铺/浮动切换）、Super+C/V/X（通用剪贴板）、scratchpad/分组/尺寸微调等** | 均未采纳——不在 AgentOS 当前功能集（agent 优先，窗口操作走 niri-mcp） |
+| **键位速查：页面还是内置浮层？** | `Super+K` → canvas 页面（可滚动/可过滤/系统配色，Omarchy 心智）；`Mod+Shift+/` → niri 内置 overlay 兜底（canvas 服务挂了也有速查可用）。两层分工见 §2.1 |
 | **binds 段整体替换语义** | niri 的 binds 段写出来就**替换全部默认键位**（不合并）。模板因此自带完整键位表，并垫底保留了方向键焦点移动；要更多默认键位从 niri 官方 default-config.kdl 拷 |
 | **锁屏依赖 swaylock** | 模板只绑键位；swaylock 未装时按键无效。安装命令见 §2 表尾注 |
 | **语法验证状态** | macOS 上无法运行 niri；KDL 语法已逐动作对照官方默认配置与 wiki（记录见调研文档 §3），**待真机 `niri validate` 验证后转正** |
@@ -110,3 +133,6 @@ Fusion 里 ⌘ 会被当作 Super 发进虚拟机，但 **macOS 自己先截获�
 ## 5. 变更历史
 
 - 2026-10-16 初版：随 `os/configs/niri/config.kdl` 模板一起定稿。
+- 2026-10-17 Super+K 切到 canvas 键位速查页（/keys，packages/canvas keys 模块）：
+  整页滚动 + 吸顶分组 + 输入过滤 + 莫兰迪系统配色，数据实时解析 niri 配置；
+  Mod+Shift+/ 保留内置 overlay 作兜底。VM 实测：真实按键弹窗、滚动、过滤全通过。

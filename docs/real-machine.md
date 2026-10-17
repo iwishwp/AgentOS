@@ -325,3 +325,29 @@ goose session
   - **误操作回滚演示 ✅（快照语义两发现）**：审计时间轴定位 16:22:16 `system.package_install t2 delegated`（误操作=agent 装了用户没要的 sl）→ `snapper rollback 8` 暴露发现三：**本机 fstab 与 grub cmdline 都钉死 `subvol=root`，set-default 式回滚重启后不生效**（snapshot.sh 注释早有预警，且需 `--ambit classic`）——无人值守等价路径：`grubby --remove-args=rootflags` + fstab 改指 `.snapshots/10/snapshot` → 重启**从快照启动实证回滚态**（findmnt 显示快照子卷、sl 消失、/home 独立子卷审计 185 条完好）→ 恢复常规启动后在常驻 root `dnf remove sl` 落定撤销。发现四：`.snapshots` 嵌套于 root 子卷内（top level 256），snapshot.sh 手册步骤里的"删旧 root 提升"会连坐快照——未执行，永久化提升另需设计（bootc/atomic 是正解，M5）。演示含两次重启，重启后 GDM 自动登录补配（`/etc/gdm/custom.conf`）恢复桌面会话。
   - **虚拟输入三坑（t1-click-drive.sh 全部沉淀，脚本头注释详录）**：① Fedora ydotoold 监听 `/tmp/.ydotool_socket` 而 ydotool 1.0.4 客户端默认找 `$XDG_RUNTIME_DIR/.ydotool_socket`——不显式 `YDOTOOL_SOCKET=` 则连接失败且被 `|| true` 吞掉，**指针从未动过**（本次排查最大的假烟雾）；② ydotool 1.0.4 参数解析器拒绝负数选项值（`-x -5` 打印 usage），负位移必须 `mousemove -- -5 0`；③ libinput 低速加速系数 ≈0.5（raw 40→逻辑 20.25），1px 步进按 2 倍 raw 补偿，钳位大位移免疫加速。
   - **mako 1.11 载体边界（如实记录）**：actions 选项只控制整条通知的默认动作、不渲染按钮（Confirm1 因此改为四横幅载体）；进一步实测**虚拟指针下"识别点的是哪条通知"的命中测试不生效**——dismiss-all 可触发，但 dismiss（单条）/invoke-default-action/exec（均需定位到具体通知）无动作；T1 选择应答改经 `makoctl invoke -n <横幅id> default`（发射与真实点击完全相同的 ActionInvoked 信号，服务端 by=notify-action 无法区分）。**真实鼠标能否直接点选横幅待用户在场复核**；mako 配色 `background=#ff00ff` 一类 `#` 值会被其 scfg 解析器当行内注释拒载（调试陷阱）。
+
+- **2026-10-17 键位速查页 ✅（Super+K → canvas /keys，Omarchy 风格）**：`Super+K`
+  从 niri 内置 hotkey overlay 切到 canvas 服务的 `/keys` 页（packages/canvas keys 模块），
+  `Mod+Shift+/` 保留内置兜底。验证链全通：
+  - **`niri validate -c` ✅**：改绑后（Super+K → spawn chromium-browser --app）配置合法；
+  - **`curl /api/keys` ✅**：实时解析 `~/.config/niri/config.kdl` → 5 分组 / 62 bind；
+    当天另一并行任务把 VM 终端改成 ghostty，页面即时反映 `spawn "ghostty"`——
+    零副本设计（不存第二份键位表）的直接证据；
+  - **真实按键弹窗 ✅**：ydotool 注入 Super+K（125:1 37:1 37:0 125:0，sudo——
+    ydotoold 的 socket 是 root 600，见下）→ chromium --app 窗口弹出，标题
+    "AgentOS 键位速查"，grim 截图 + 视觉模型复核：深色莫兰迪（暖深底/橄榄描边/
+    米色键帽）、顶栏标题+过滤胶囊、分组卡片带条目计数、键帽 kbd、CJK 字体全正常；
+  - **滚动 ✅**：向窗口注入 4×Page_Down（109）后二次截图——视口从"启动应用"组
+    翻到"工作区"组且节标题吸顶在视口上部，内容仍有余量（62 键 > 一屏）；
+  - **过滤 ✅**：注入 `/`（53）聚焦过滤框 + 输入 fuzzel → 页面即时只剩 2 行
+    （Super+Space / Mod+D），计数"2 / 62 个键位"；
+  - **chromium --app 在主会话有头模式可用**（此前只在嵌套水族馆里被认为不稳）：
+    关键是带上 browser-mcp 沉淀的 flags（--password-store=basic 必须；
+    --ozone-platform=wayland；--no-first-run）。Fedora 可执行名是
+    **chromium-browser**（PATH 里没有 chromium）。
+  - **工程发现**：① chromium 首启双窗（首次建 profile 弹两个相同窗口的假象，
+    关掉再按即单窗，复现确认非绑定重复触发）；② ydotool socket 权限——root 跑的
+    ydotoold 监听 /tmp/.ydotool_socket（srw------- root），普通用户直连
+    Permission denied，须 `sudo -S env YDOTOOL_SOCKET=… ydotool …`；③ 同机并行
+    任务隔离可复现——对 niri 配置只做 Super+K 块的定点替换（python 断言唯一匹配
+    后 replace），另一任务的 ghostty 改动原样保留并被键位页正确读取。

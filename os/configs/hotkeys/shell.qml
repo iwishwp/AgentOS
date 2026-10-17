@@ -248,7 +248,7 @@ ShellRoot {
                   Text {
                     id: arrowText
                     anchors.left: parent.left
-                    anchors.leftMargin: Math.round(parent.width * 0.5)
+                    anchors.leftMargin: Math.round(parent.width * 0.54)
                     anchors.verticalCenter: parent.verticalCenter
                     text: modelData.type === "b" ? "→" : ""
                     color: root.colors.primary

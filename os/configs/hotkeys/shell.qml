@@ -161,16 +161,16 @@ ShellRoot {
         Rectangle {
           id: panel
           // 尺寸绑 screen（创建瞬间 contentItem 可能未定型，绑 parent.width 会得负值）
-          readonly property real panelWidth: (win.screen?.width ?? 1280) - 48
-          readonly property real maxH: (win.screen?.height ?? 800) - 80
-          readonly property real contentH: Math.min(view.contentHeight + 108, maxH)
+          readonly property real panelWidth: (win.screen?.width ?? 1280) - 24
+          readonly property real maxH: (win.screen?.height ?? 800) - 24
+          readonly property real contentH: Math.min(view.contentHeight + 132, maxH)
 
           width: panelWidth
           height: contentH
           // Omarchy 心智：顶部居中（状态栏下方），非屏幕正中
           anchors.horizontalCenter: parent.horizontalCenter
           anchors.top: parent.top
-          anchors.topMargin: 40
+          anchors.topMargin: 12
           radius: 2
 
           // 柔影近似：面板下垫一块略下移的半透明黑块（参考图有极淡投影）
@@ -180,8 +180,8 @@ ShellRoot {
             height: panel.height
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
-            anchors.topMargin: 14
-            radius: 10
+            anchors.topMargin: 10
+            radius: 8
             color: root.withAlpha("#000000", 0.35)
           }
           color: root.withAlpha(root.colors.surface_container, 0.82)
@@ -193,7 +193,7 @@ ShellRoot {
 
           Column {
             anchors.fill: parent
-            anchors.margins: 24
+            anchors.margins: 36
             spacing: 44
 
             // 标题：小号、常规字重、灰（Omarchy "Keybindings" 的层级：弱于正文）
@@ -210,10 +210,10 @@ ShellRoot {
             ListView {
               id: view
               width: parent.width
-              height: parent.height - 108
+              height: parent.height - 132
               clip: true
               interactive: true
-              spacing: 8
+              spacing: 10
 
               model: {
                 const rows = [];
@@ -227,7 +227,7 @@ ShellRoot {
               delegate: Item {
                 required property var modelData
                 width: view.width
-                height: modelData.type === "h" ? 40 : 34
+                height: modelData.type === "h" ? 40 : 44
 
                 // 分组标题：常规字重小灰字 + 上方留白（Omarchy 无分组，取其标题区的弱化语感）
                 Text {
@@ -253,7 +253,7 @@ ShellRoot {
                     anchors.verticalCenter: parent.verticalCenter
                     text: modelData.type === "b" ? root.comboText(modelData.keys) : ""
                     color: root.colors.primary
-                    font.pixelSize: 17
+                    font.pixelSize: 19
                     font.family: "monospace"
                   }
 
@@ -264,7 +264,7 @@ ShellRoot {
                     anchors.verticalCenter: parent.verticalCenter
                     text: modelData.type === "b" ? "→" : ""
                     color: root.colors.primary
-                    font.pixelSize: 17
+                    font.pixelSize: 19
                     font.family: "monospace"
                   }
 
@@ -275,7 +275,7 @@ ShellRoot {
                     anchors.verticalCenter: parent.verticalCenter
                     text: modelData.type === "b" ? (modelData.title ?? "") : ""
                     color: root.colors.on_surface
-                    font.pixelSize: 17
+                    font.pixelSize: 19
                     font.family: "monospace"
                     elide: Text.ElideRight
                   }

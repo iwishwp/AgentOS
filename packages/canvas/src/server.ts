@@ -1,6 +1,13 @@
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
+import {
+  DEFAULT_AUDIT_PATH,
+  DEFAULT_RECORDINGS_DIR,
+  listRecordings,
+  readAudit,
+} from "./replay.js";
+import { replayPageHtml } from "./replay-page.js";
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -19,17 +26,29 @@ const MIME: Record<string, string> = {
   ".md": "text/markdown; charset=utf-8",
   ".csv": "text/csv; charset=utf-8",
   ".fodt": "application/xml; charset=utf-8",
+  ".mkv": "video/x-matroska",
+  ".webm": "video/webm",
+  ".mp4": "video/mp4",
 };
 
 /**
- * canvas 静态服务：托管 ~/Agent/canvas 下 agent 生成的页面。
- * 只绑 127.0.0.1；所有路径经 realpath 越界检查（与 files-mcp 同款沙箱纪律）。
+ * canvas 静态服务：托管 ~/Agent/canvas 下 agent 生成的页面，附带 M4 回放面：
+ *   /api/audit?tool=&ext=&decision=&tier=&since=&limit=  审计时间轴 JSON（出口侧打码兜底）
+ *   /api/recordings                                        会话录像清单
+ *   /recordings/<name>                                     录像播放（Range 支持）
+ *   /replay                                                回放页（时间轴 + 录像）
+ * 只绑 127.0.0.1；所有文件路径经 realpath 越界检查（与 files-mcp 同款沙箱纪律）。
  * agent 的使用方式：files__write_file("canvas/<名字>/index.html", ...) 然后
  * desktop__open("http://127.0.0.1:7788/<名字>/")。
  */
-export function createCanvasServer(rootRaw: string): http.Server {
+export function createCanvasServer(
+  rootRaw: string,
+  opts: { auditPath?: string; recordingsDir?: string } = {},
+): http.Server {
   fs.mkdirSync(rootRaw, { recursive: true });
   const root = fs.realpathSync(rootRaw);
+  const auditPath = opts.auditPath ?? process.env["AGENTOS_AUDIT_PATH"] ?? DEFAULT_AUDIT_PATH;
+  const recordingsDir = opts.recordingsDir ?? DEFAULT_RECORDINGS_DIR;
 
   const safe = (relUrl: string): string | null => {
     // URL 路径以 / 开头，path.resolve 会把它当绝对路径丢弃 root，必须先剥掉
@@ -47,12 +66,46 @@ export function createCanvasServer(rootRaw: string): http.Server {
       return;
     }
     let pathname: string;
+    let query: URLSearchParams;
     try {
-      pathname = decodeURIComponent(new URL(req.url ?? "/", "http://localhost").pathname);
+      const u = new URL(req.url ?? "/", "http://localhost");
+      pathname = decodeURIComponent(u.pathname);
+      query = u.searchParams;
     } catch {
       res.writeHead(400).end("bad url");
       return;
     }
+
+    // ---- 回放面（内置路由，先于静态文件） ----
+    if (pathname === "/api/audit") {
+      const num = (k: string) => (query.get(k) ? Number(query.get(k)) : undefined);
+      const entries = readAudit(auditPath, {
+        tool: query.get("tool") ?? undefined,
+        ext: query.get("ext") ?? undefined,
+        decision: query.get("decision") ?? undefined,
+        tier: query.get("tier") ?? undefined,
+        since: query.get("since") ?? undefined,
+        limit: num("limit"),
+      });
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      res.end(JSON.stringify(entries));
+      return;
+    }
+    if (pathname === "/api/recordings") {
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      res.end(JSON.stringify(listRecordings(recordingsDir)));
+      return;
+    }
+    if (pathname === "/replay" || pathname === "/replay/") {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(replayPageHtml());
+      return;
+    }
+    if (pathname.startsWith("/recordings/")) {
+      serveRecording(pathname, req, res);
+      return;
+    }
+
     if (pathname === "/" || pathname === "") {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       res.end(indexPage(root));
@@ -67,14 +120,69 @@ export function createCanvasServer(rootRaw: string): http.Server {
       res.end("not found");
       return;
     }
+    serveFile(file, req, res);
+
+    /** 录像沙箱：仅 recordings 目录内的媒体文件（同样的 realpath 纪律） */
+    function serveRecording(p: string, request: http.IncomingMessage, response: http.ServerResponse): void {
+      const name = path.basename(p.replace(/^\/+/, ""));
+      const abs = path.resolve(recordingsDir, name);
+      if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
+        response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+        response.end("not found");
+        return;
+      }
+      const real = fs.realpathSync(abs);
+      const dirReal = fs.realpathSync(recordingsDir);
+      if (real !== dirReal && !real.startsWith(dirReal + path.sep)) {
+        response.writeHead(403).end();
+        return;
+      }
+      if (!/\.(mkv|webm|mp4)$/i.test(name)) {
+        response.writeHead(403).end();
+        return;
+      }
+      serveFile(real, request, response);
+    }
+  });
+
+  /** 静态文件 + 视频 Range 支持（HTML5 video 拖动进度条需要 206） */
+  function serveFile(file: string, request: http.IncomingMessage, response: http.ServerResponse): void {
     const type = MIME[path.extname(file).toLowerCase()] ?? "application/octet-stream";
-    res.writeHead(200, { "content-type": type, "cache-control": "no-cache" });
-    if (req.method === "HEAD") {
-      res.end();
+    const size = fs.statSync(file).size;
+    const range = request.headers.range;
+    if (range && /^video\//.test(type)) {
+      const m = /bytes=(\d*)-(\d*)/.exec(String(range));
+      if (m) {
+        let start = m[1] ? Number(m[1]) : 0;
+        let end = m[2] ? Number(m[2]) : size - 1;
+        if (Number.isNaN(start) || start >= size) start = 0;
+        if (Number.isNaN(end) || end >= size) end = size - 1;
+        response.writeHead(206, {
+          "content-type": type,
+          "content-range": `bytes ${start}-${end}/${size}`,
+          "accept-ranges": "bytes",
+          "content-length": end - start + 1,
+          "cache-control": "no-cache",
+        });
+        if (request.method === "HEAD") {
+          response.end();
+          return;
+        }
+        fs.createReadStream(file, { start, end }).pipe(response);
+        return;
+      }
+    }
+    response.writeHead(200, {
+      "content-type": type,
+      "cache-control": "no-cache",
+      ...(type.startsWith("video/") ? { "accept-ranges": "bytes" } : {}),
+    });
+    if (request.method === "HEAD") {
+      response.end();
       return;
     }
-    fs.createReadStream(file).pipe(res);
-  });
+    fs.createReadStream(file).pipe(response);
+  }
 }
 
 interface ArtifactRow {

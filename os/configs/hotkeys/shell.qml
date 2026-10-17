@@ -161,9 +161,9 @@ ShellRoot {
         Rectangle {
           id: panel
           // 尺寸绑 screen（创建瞬间 contentItem 可能未定型，绑 parent.width 会得负值）
-          readonly property real panelWidth: (win.screen?.width ?? 1280) - 64
+          readonly property real panelWidth: (win.screen?.width ?? 1280) - 48
           readonly property real maxH: (win.screen?.height ?? 800) - 80
-          readonly property real contentH: Math.min(view.contentHeight + 76, maxH)
+          readonly property real contentH: Math.min(view.contentHeight + 96, maxH)
 
           width: panelWidth
           height: contentH
@@ -171,7 +171,7 @@ ShellRoot {
           anchors.horizontalCenter: parent.horizontalCenter
           anchors.top: parent.top
           anchors.topMargin: 40
-          radius: 4
+          radius: 2
           color: root.withAlpha(root.colors.surface_container, 0.88)
           border.width: 1
           border.color: root.withAlpha(root.colors.outline_variant, 0.5)
@@ -181,14 +181,15 @@ ShellRoot {
 
           Column {
             anchors.fill: parent
-            anchors.margins: 32
-            spacing: 20
+            anchors.margins: 24
+            spacing: 36
 
             // 标题：小号、常规字重、灰（Omarchy "Keybindings" 的层级：弱于正文）
             Text {
               text: "键位速查"
               color: root.colors.on_surface_variant
-              font.pixelSize: 12
+              opacity: 0.75
+              font.pixelSize: 11
               font.weight: Font.Normal
               font.family: "monospace"
             }
@@ -196,10 +197,10 @@ ShellRoot {
             ListView {
               id: view
               width: parent.width
-              height: parent.height - 32
+              height: parent.height - 47
               clip: true
               interactive: true
-              spacing: 6
+              spacing: 8
 
               model: {
                 const rows = [];
@@ -213,19 +214,19 @@ ShellRoot {
               delegate: Item {
                 required property var modelData
                 width: view.width
-                height: modelData.type === "h" ? 34 : 28
+                height: modelData.type === "h" ? 40 : 34
 
                 // 分组标题：常规字重小灰字 + 上方留白（Omarchy 无分组，取其标题区的弱化语感）
                 Text {
                   visible: modelData.type === "h"
                   text: modelData.text ?? ""
                   color: root.colors.on_surface_variant
-                  opacity: 0.8
-                  font.pixelSize: 12
+                  opacity: 0.6
+                  font.pixelSize: 11
                   font.weight: Font.Normal
                   anchors.left: parent.left
                   anchors.top: parent.top
-                  anchors.topMargin: 14
+                  anchors.topMargin: 18
                 }
 
                 // 行：键左列（左对齐、右参差），说明全部从固定 x 起始，"→" 分隔（Omarchy 行式）
@@ -239,7 +240,7 @@ ShellRoot {
                     anchors.verticalCenter: parent.verticalCenter
                     text: modelData.type === "b" ? root.comboText(modelData.keys) : ""
                     color: root.colors.primary
-                    font.pixelSize: 15
+                    font.pixelSize: 17
                     font.family: "monospace"
                   }
 
@@ -250,7 +251,7 @@ ShellRoot {
                     anchors.verticalCenter: parent.verticalCenter
                     text: modelData.type === "b" ? "→  " + (modelData.title ?? "") : ""
                     color: root.colors.on_surface
-                    font.pixelSize: 15
+                    font.pixelSize: 17
                     font.family: "monospace"
                     elide: Text.ElideRight
                   }

@@ -71,12 +71,17 @@ niri 配置里的 `Super`（及 `Mod`，在 TTY 会话中 Mod 即 Super）物理
 
 ### 2.1 键位速查（Super+K：系统浮层 + agent 网页版）
 
-`Super+K` 弹出 **layer-shell 浮层**（`qs -c agentos-hotkeys`，Omarchy/niri 原生心智：
-顶部居中（状态栏下方）、轻压暗背景、一行一条，Esc/点按即关，进程即起即退无常驻）：
+`Super+K` 弹出 **layer-shell 浮层**（`qs -c agentos-hotkeys`，Omarchy Keybindings
+形态：近全屏半透明面板（四边距屏 12px）、轻压暗背景、Esc/点按即关，进程即起即退
+无常驻）：
 
 - **不是应用窗口**——第一版用过 chromium `--app` 开 canvas 页，被否（重、像启动了
   个 app）；现改 layer-shell 覆盖层，`os/configs/hotkeys/shell.qml`（quickshell
   独立小配置，安装 `scripts/install-hotkeys.sh`）；
+- **行式仿 Omarchy**（按参考截图像素实测对齐）：纯文本键列（大写等宽，组合键渲染为
+  `SUPER SHIFT + F`：修饰键空格分隔、末键前加 `+`，只改渲染不动解析）、无键帽芯片；
+  说明列所有行从同一 x 起始（内容宽 52%），`→` 与键同强调色；标题左上角小号常规
+  字重灰字、下方大留白；分组标题弱化（小号低透明度）；
 - **一行一条 + 超高滚动**（滚轮/PageUp/PageDown/方向键）；
 - **数据零副本**：启动时解析 `~/.config/niri/config.kdl` 的 binds 段（62 条全量，
   含内联参数与滚轮键；`AGENTOS_NIRI_CONFIG` 可覆盖）；

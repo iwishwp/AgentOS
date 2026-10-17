@@ -1,8 +1,9 @@
 // AgentOS 键位速查浮层（qs -c agentos-hotkeys）
 //
-// Omarchy/niri 原生心智：按 Super+K 居中弹出一块浮层，一行一条键位；
-// 本实现是 layer-shell 覆盖层（不是应用窗口）：全屏透明层 + 居中面板，
-// 点任意处或按 Esc 关闭（进程即退，无常驻）。
+// Omarchy/niri 原生心智：按 Super+K 顶部弹出近全宽浮层；本实现是 layer-shell
+// 覆盖层（不是应用窗口）：全屏透明层 + 顶部面板，点任意处或按 Esc 关闭
+//（进程即退，无常驻）。行式仿 Omarchy Keybindings：纯文本键列（大写等宽，
+// "SUPER SHIFT + F" 形态）左对齐，说明从固定列起始、"→" 分隔，无键帽芯片。
 //
 // 数据零副本：启动时解析 niri 配置的 binds 段（AGENTOS_NIRI_CONFIG 可覆盖路径），
 // 分组沿用配置里的 "// ==== X ====" 注释；标题取 hotkey-overlay-title，缺省用动作名。
@@ -27,6 +28,24 @@ ShellRoot {
     "outline": "#6b6a63", "outline_variant": "#6c6a61", "primary": "#dad8ce"
   })
   property var colors: fallbackColors
+
+  // 十六进制色 → 指定透明度的 Qt.rgba（配色仍实时来自 colors.json，只叠 alpha）
+  function withAlpha(hex, a) {
+    const h = String(hex).replace("#", "");
+    return Qt.rgba(
+      parseInt(h.substring(0, 2), 16) / 255,
+      parseInt(h.substring(2, 4), 16) / 255,
+      parseInt(h.substring(4, 6), 16) / 255, a);
+  }
+
+  // 键串 → Omarchy 形态的显示文本："Super+Shift+Return" → "SUPER SHIFT + RETURN"
+  //（只改渲染：修饰键空格分隔，仅最后一个键前加 " + "；滚轮 * 后缀剥掉）
+  function comboText(keys) {
+    const parts = String(keys).replace(/\*+$/, "").split("+")
+      .map(p => p.trim().toUpperCase());
+    if (parts.length === 1) return parts[0];
+    return parts.slice(0, -1).join(" ") + " + " + parts[parts.length - 1];
+  }
 
   // ---- 解析 niri 配置 → [{title, binds:[{keys,title}]}] ----
   property var groups: []
@@ -138,49 +157,63 @@ ShellRoot {
         Rectangle { anchors.fill: parent; color: "#000000"; opacity: 0.15 }
         MouseArea { anchors.fill: parent; onClicked: Qt.quit() }
 
-        // ---- 居中面板（Omarchy/niri 心智：一行一条，超高滚动） ----
+        // ---- 近全宽顶部面板（Omarchy 形态：顶部悬浮、近直角、半透明、超高滚动） ----
         Rectangle {
           id: panel
           // 尺寸绑 screen（创建瞬间 contentItem 可能未定型，绑 parent.width 会得负值）
-          readonly property real panelWidth: Math.min(720, (win.screen?.width ?? 1280) - 80)
-          readonly property real maxH: (win.screen?.height ?? 800) - 100
-          readonly property real contentH: Math.min(view.contentHeight + 56, maxH)
+          readonly property real panelWidth: (win.screen?.width ?? 1280) - 24
+          readonly property real maxH: (win.screen?.height ?? 800) - 24
+          readonly property real contentH: Math.min(view.contentHeight + 148, maxH)
 
           width: panelWidth
           height: contentH
           // Omarchy 心智：顶部居中（状态栏下方），非屏幕正中
           anchors.horizontalCenter: parent.horizontalCenter
           anchors.top: parent.top
-          anchors.topMargin: 56
-          radius: 16
-          color: root.colors.surface_container
+          anchors.topMargin: 12
+          radius: 2
+
+          // 柔影近似：面板下垫一块略下移的半透明黑块（参考图有极淡投影）
+          Rectangle {
+            z: -1
+            width: panel.width
+            height: panel.height
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.top
+            anchors.topMargin: 10
+            radius: 8
+            color: root.withAlpha("#000000", 0.35)
+          }
+          color: root.withAlpha(root.colors.surface_container, 0.82)
           border.width: 1
-          border.color: root.colors.outline_variant
+          border.color: root.withAlpha(root.colors.outline_variant, 0.5)
 
           // 面板本体拦截点按（点内容不穿透关闭，避免误触；点面板外关闭）
           MouseArea { anchors.fill: parent; onClicked: {} }
 
           Column {
             anchors.fill: parent
-            anchors.margins: 16
-            spacing: 10
+            anchors.margins: 36
+            spacing: 60
 
+            // 标题：小号、常规字重、灰（Omarchy "Keybindings" 的层级：弱于正文）
             Text {
               text: "键位速查"
               color: root.colors.on_surface_variant
-              font.pixelSize: 13
-              font.bold: true
-              anchors.horizontalCenter: parent.horizontalCenter
-              bottomPadding: 2
+              opacity: 0.75
+              font.pixelSize: 11
+              font.weight: Font.Normal
+              font.family: "monospace"
+              height: 16
             }
 
             ListView {
               id: view
               width: parent.width
-              height: parent.height - 30
+              height: parent.height - 148
               clip: true
               interactive: true
-              spacing: 2
+              spacing: 12
 
               model: {
                 const rows = [];
@@ -194,48 +227,57 @@ ShellRoot {
               delegate: Item {
                 required property var modelData
                 width: view.width
-                height: modelData.type === "h" ? 26 : 24
+                height: modelData.type === "h" ? 46 : 50
 
+                // 分组标题：常规字重小灰字 + 上方留白（Omarchy 无分组，取其标题区的弱化语感）
                 Text {
                   visible: modelData.type === "h"
                   text: modelData.text ?? ""
                   color: root.colors.on_surface_variant
-                  font.pixelSize: 12
-                  font.bold: true
-                  topPadding: 8
+                  opacity: 0.6
+                  font.pixelSize: 11
+                  font.weight: Font.Normal
+                  anchors.left: parent.left
+                  anchors.top: parent.top
+                  anchors.topMargin: 18
                 }
 
-                Row {
+                // 行：键左列（左对齐、右参差），说明全部从固定 x 起始，"→" 分隔（Omarchy 行式）
+                Item {
                   visible: modelData.type === "b"
-                  height: 26
-                  spacing: 10
+                  anchors.fill: parent
 
-                  Rectangle {
-                    width: keyLabel.implicitWidth + 16
-                    height: 22
-                    radius: 6
+                  Text {
+                    id: keysText
+                    anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
-                    color: root.colors.surface_container_highest
-                    border.width: 1
-                    border.color: root.colors.outline
-
-                    Text {
-                      id: keyLabel
-                      anchors.centerIn: parent
-                      text: modelData.keys ?? ""
-                      color: root.colors.primary
-                      font.pixelSize: 12
-                      font.family: "monospace"
-                    }
+                    text: modelData.type === "b" ? root.comboText(modelData.keys) : ""
+                    color: root.colors.primary
+                    font.pixelSize: 24
+                    font.family: "monospace"
                   }
 
                   Text {
+                    id: arrowText
+                    anchors.left: parent.left
+                    anchors.leftMargin: Math.round(parent.width * 0.52)
                     anchors.verticalCenter: parent.verticalCenter
-                    text: modelData.title ?? ""
+                    text: modelData.type === "b" ? "→" : ""
+                    color: root.colors.primary
+                    font.pixelSize: 24
+                    font.family: "monospace"
+                  }
+
+                  Text {
+                    anchors.left: arrowText.right
+                    anchors.leftMargin: 10
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: modelData.type === "b" ? (modelData.title ?? "") : ""
                     color: root.colors.on_surface
-                    font.pixelSize: 13
+                    font.pixelSize: 24
+                    font.family: "monospace"
                     elide: Text.ElideRight
-                    width: panel.width - keyLabel.implicitWidth - 80
                   }
                 }
               }

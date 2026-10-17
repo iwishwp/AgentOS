@@ -46,6 +46,9 @@ FROM quay.io/fedora/fedora-bootc:${FEDORA_VERSION} AS builder
 RUN dnf -y install nodejs22 nodejs22-npm git && dnf clean all
 
 WORKDIR /build
+# bootc 基础镜像的 /root 是指向 var/roothome 的悬空符号链接（无状态布局），
+# npm 以 /root 为 HOME 会在 mkdir 时报 ENOTDIR——把 HOME 指到工作目录
+ENV HOME=/build
 # 只拷构建必需物：workspaces 清单 + packages/（.containerignore 已剔除
 # .git/node_modules/dist/docs 等，context 干净且可复现）
 COPY package.json package-lock.json ./

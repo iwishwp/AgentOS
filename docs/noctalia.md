@@ -161,3 +161,31 @@ grep -q BackgroundEffect /usr/lib64/qt6/qml/Quickshell/Wayland/*.qmltypes  # blu
 - `scripts/install-noctalia.sh --tarball ... --verify` 在目标机端到端通过（exit 0）；
 - niri `spawn-at-startup` 已切 `qs -c noctalia`，`niri validate` 通过，waybar 已停用
   （配置保留于 `os/configs/waybar/`）。
+
+## 8. LanRhyme 观感移植（2026-10-17，agentos-vm）
+
+对齐 [LanRhyme/dotfiles](https://github.com/LanRhyme/dotfiles) 截图：**左侧垂直栏 +
+莫兰迪配色（源色 #eee6ba）+ kita.png 插画壁纸**。入口：`scripts/apply-lanrhyme-theme.sh`
+（幂等），素材与机制说明见 `os/configs/noctalia/lanrhyme/README.md`。
+
+实测踩坑（都已写进脚本）：
+
+- **colors.json 是输出缓存**：`useWallpaperColors=false` 时启动会套预设主题并覆写
+  该文件——自定义色板必须配合 `useWallpaperColors=true`（ColorSchemeService
+  `Component.onCompleted` 的 `applyScheme` 分支即被跳过，日志中不再出现
+  "Applying color scheme"）；
+- **壁纸选择持久化在 `~/.cache/noctalia/wallpapers.json`**（不在 settings.json），
+  键为屏幕名（本机 `Virtual-1`，经 `niri msg --json outputs` 取）；
+- 垂直栏下托盘必须 `drawerEnabled=true` 折叠（否则溢出），电池组件对 VM 无意义可去；
+- 换配置后的重启：`pkill -f '[q]s -c noctalia'`（bracket 防自匹配）+ 会话 env
+  （WAYLAND_DISPLAY/XDG_RUNTIME_DIR/XDG_CURRENT_DESKTOP=niri）下 setsid 重启。
+
+验证：重启后截图（grim）→ 视觉模型确认「壁纸完整、垂直栏模块齐全、高亮色调为
+暖米色（莫兰迪）」；colors.json 复查未被覆写（source_color 仍 #eee6ba）。
+
+**毛玻璃（未完成，路径已勘明）**：niri 26.04 已实现 `ext-background-effect-v1`
+（其该版本头号特性），Noctalia 侧需 quickshell ≥0.3 的 `BackgroundEffect`。
+COPR `errornointernet/quickshell` 有 fedora-44-aarch64 的 0.3.2 成功构建。
+升级方案：先 `snapper` 快照 → copr 升级 quickshell → 验证 v4.7.1+补丁集是否仍
+可启动（0.2→0.3 有破坏性变更风险）；不行则评估直升 Noctalia v5（settingsVersion
+我们已同源为 59）。升完即可撤补丁 0001/0004，毛玻璃与音频频谱一并回归。

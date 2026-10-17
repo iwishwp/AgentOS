@@ -8,7 +8,7 @@ import { ConfirmClient, summarizeArgs } from "./confirm.js";
  *
  * 流程：policy.decide → 审计（含 tier/confirm 扩字段）→
  *   deny   → isError 拒绝（原文案不变）；
- *   confirm→ ConfirmClient.ask（mako 通知按钮 / Respond / 30s 超时），
+ *   confirm→ ConfirmClient.ask（点确认横幅 / Respond / 30s 超时），
  *            allow_once/allow_session 放行，deny_once/always_deny 拒绝；
  *   allow  → 直接执行。
  */

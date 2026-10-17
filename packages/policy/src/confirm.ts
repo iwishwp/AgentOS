@@ -10,8 +10,8 @@ export type ConfirmChoice =
 
 export interface ConfirmOutcome {
   choice: ConfirmChoice;
-  /** 谁做的决定：notify-action（通知按钮）/ respond:<n>（编程应答）/ session-memory /
-   *  timeout（30s 超时=deny_once）/ dismissed（用户关掉通知=deny_once）/ service-unavailable */
+  /** 谁做的决定：notify-action（点确认横幅）/ respond（编程应答）/ session-memory /
+   *  timeout（30s 超时=deny_once）/ always-deny-memory / service-unavailable */
   by: string;
   /** 从发起确认到出结果的毫秒数（审计用） */
   responseMs: number;
@@ -81,7 +81,7 @@ export function parseWaitResult(
 /**
  * org.agentos.Confirm1 的客户端（T1 确认流，permissions.md §4.1）。
  *
- * - 发起 Request → 阻塞 Wait → 拿到用户选择（mako 通知按钮 / Respond 编程应答 / 30s 超时）；
+ * - 发起 Request → 阻塞 Wait → 拿到用户选择（点确认横幅 / Respond 编程应答 / 30s 超时）；
  * - allow_session 记内存表（本 server 进程生命周期内不再问）；
  * - always_deny 写回 policy.yaml（注：yaml 重写会丢注释，且其他已在跑的 server 进程
  *   在重启前用旧内存规则——本进程由 denied 集合立即生效）；

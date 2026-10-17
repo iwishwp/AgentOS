@@ -1,7 +1,8 @@
 # M5：Fedora Atomic（bootc）镜像设计与 PoC 记录
 
-- **状态**：PoC 代码交付完成；VM 构建验证因网络阻断未完成（§6 + 附录），
-  转交 CI / x86_64 环境
+- **状态**：✅ aarch64 VM 构建验证完成（2026-10-17，§6.1）——
+  `agentos:dev-aarch64` 4.38GB / 81 层，容器内冒烟全过。首次构建的网络阻断
+  已用「Mac 中转 skopeo」方案解决（附录 A）；x86_64 仍待 CI 原生 runner
 - **决策依据**：[ADR-0001](decisions/0001-base-distribution.md) 第 3 条——M5 发行形态默认走
   Fedora Atomic（bootc/OCI 镜像），Bazzite 生产实证模式
 - **交付物**：`os/bootc/Containerfile`、`os/bootc/{firstboot,systemd}/`、
@@ -220,3 +221,46 @@ CI / x86_64 环境（遗留清单 #8）。**
 - podman build 全流程（层缓存、多阶段、bootc container lint）；
 - 镜像大小/层数、容器内冒烟（niri --version 等）；
 - SDDM+niri 登录会话真机点亮、首启动单元实际行为、goose 首启动安装。
+
+---
+
+## 附 A：2026-10-17 构建打通记录（Mac 中转方案）
+
+首次构建的网络阻断（附录：quay.io blob 传输劣化）不是死路——**VM 到 quay 慢，
+Mac 到 quay 正常**。用 skopeo 在 Mac 拉镜像、scp 进 VM 加载，构建链路即通：
+
+```bash
+# Mac（brew install skopeo 一次性）：
+# 注意 quay 的 manifest 用 docker 风格 "arm64"，--override-arch 填 aarch64 会
+# 报 "no image found for architecture aarch64"——必须填 arm64
+skopeo copy --override-arch arm64 --override-os linux \
+    docker://quay.io/fedora/fedora-bootc:44 oci-archive:/tmp/bootc44.tar
+scp /tmp/bootc44.tar VM:/tmp/
+
+# VM：
+podman load -i /tmp/bootc44.tar
+podman tag <loaded-id> quay.io/fedora/fedora-bootc:44   # oci-archive 不带 tag
+# 之后 scripts/build-image.sh 的预 pull 命中本地 tag，blob 全在本地，秒过
+```
+
+实测：Mac 拉 933MB 压缩归档约 2 分钟（VM 直连 2 小时未完成）；构建总耗时约
+25 分钟（dnf 层走 Fedora 镜像源 1-4MiB/s，npm 层正常）。
+
+打通过程中的两处 Containerfile 修复（均已提交）：
+
+1. **builder 阶段 `ENV HOME=/build`**：bootc 基础镜像的 `/root` 是指向
+   `var/roothome` 的悬空符号链接（无状态布局），npm 以 /root 为 HOME 会
+   `mkdir` 报 ENOTDIR；
+2. **F44 无 `pipewire-audio` 子包**（F34 时代命名）：按真机实况拆为
+   `pipewire pipewire-pulseaudio wireplumber`。
+
+产物与冒烟（`--smoke`）：
+
+```
+localhost/agentos:dev-aarch64  4.38 GB  81 层
+niri 26.04 / node v22.23.1 / gpu-screen-recorder 6.1.4 / sddm 0.21.0
+canvas dist 语法 OK；defaults（config.kdl+aesthetics.kdl）与 3 个 user 单元就位
+```
+
+仍未验证（移交 CI/后续）：x86_64 构建、bootc-image-builder 出 RAW/ISO、
+SDDM 点亮真机、greenboot 回滚。

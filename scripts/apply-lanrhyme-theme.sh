@@ -82,6 +82,19 @@ cp "${LAN_DIR}/colors.json" "${NOCTALIA_DIR}/colors.json"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 bash "${SCRIPT_DIR}/theme-noctalia.sh" || true
 bash "${SCRIPT_DIR}/theme-ghostty.sh" || true
+# 防覆写钩子（2026-10-18 实测：Noctalia 暗亮切换/换壁纸会覆写 colors.json——浅色默认
+# 值直接顶掉我们的色板）：三个 hook 全部挂回 theme-noctalia.sh 重新落盘
+python3 - <<'PYHOOK'
+import json, os
+p = os.path.expanduser("~/.config/noctalia/settings.json")
+d = json.load(open(p))
+d.setdefault("hooks", {})
+d["hooks"]["enabled"] = True
+for h in ("darkModeChange", "wallpaperChange", "colorGeneration"):
+    d["hooks"][h] = "bash /home/demon/AgentOS/scripts/theme-noctalia.sh"
+json.dump(d, open(p, "w"), indent=2, ensure_ascii=False)
+print("hooks: darkModeChange/wallpaperChange/colorGeneration -> theme-noctalia.sh")
+PYHOOK
 echo "colors.json: $(python3 -c "import json,os;print(json.load(open(os.path.expanduser('~/.config/noctalia/colors.json')))['source_color'])")"
 
 # ---- 3) 壁纸 ----

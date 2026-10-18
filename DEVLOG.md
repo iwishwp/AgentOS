@@ -167,6 +167,11 @@ worktree `feat/goose-e2e-skill`（测试 229 基线不动，全绿）。三件�
 ---
 
 ## 2026-10-18（晚）
+- **两处收尾**：设置条目更名"系统设置"（去括号说明）；Noctalia 暗亮切换会**覆写
+  colors.json**（实测切浅色后 72 键莫兰迪被 437 字节浅色默认顶掉）——挂
+  darkModeChange/wallpaperChange/colorGeneration 三钩子自动重落色板，darkMode 回暗档
+  （莫兰迪浅色变体留待后续生成）。
+
 - **启动器统一与设置入口修复**：Super+D/Space → `agentos-launcher`（Noctalia 启动面板
   IPC，fuzzel 兜底——换状态栏只改脚本一处，键位与习惯不变）；"设置"打不开的根因=
   gnome-control-center 拒绝非 GNOME 会话（实测原话 "only supported under GNOME and

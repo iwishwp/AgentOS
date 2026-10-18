@@ -88,7 +88,7 @@ extensions:
 | `a11y_dump_tree` | 倒某应用的无障碍树（找按钮名/结构） | `app` |
 | `a11y_click` | **按 accessible 名称点击**（无需焦点不打扰用户） | `app`、`buttonName` |
 | `a11y_read_texts` | 读应用全部非空文本（显示屏/结果/标签） | `app` |
-| `a11y_set_text` | 按名称写文本框 | `app`、`name`、`text` |
+| `a11y_set_text` | 按节点名写文本框 | `app`、`match`（名称子串，缺省 `*` 第一个）、`text` |
 
 实测纪律：**按名称寻址，不要按树索引**（树结构跨 AT 连接会重建）；GTK4 的树要等 AT 客户端
 注册后才完整；同名多实例时桥解析到先注册者——先读文本对状态判别实例，必要时关掉多余实例。
@@ -117,7 +117,7 @@ extensions:
 |---|---|---|
 | `open` | 打开产物：URL 或文件；office 文档**必须带 `app: "libreoffice"`**（白名单，系统 MIME 关联不可靠） | `target`、`app?` |
 | `notify` | 桌面通知（三档见 §3） | `summary`（必填）、`body`、`urgency`、`action?` |
-| `confirm` | **向用户提问/要决策**（T1 四横幅，带选项） | `summary`、`choices`、`timeout_ms` |
+| `confirm` | **向用户请示/要决策**（T1 四横幅：允许/会话允许/拒绝/永不，30s 无应答=拒绝） | `summary`（不放敏感内容）、`tier?`（t1/t2，影响文案） |
 | `clipboard_read` / `clipboard_write` | 剪贴板读写 | — |
 
 ### session —— 水族馆（agent 专属嵌套 niri 会话，GUI 活都在这干）
@@ -161,7 +161,7 @@ extensions:
 |---|---|---|
 | niri IPC socket 路径每次会话变 | `niri msg` 连不上 | 用启动器（自动发现 `NIRI_SOCKET`），别硬编码 |
 | Chromium 钥匙串锁死网络服务 | 浏览器拉起即卡 | 启动带 `--password-store=basic`（browser 扩展已内建；自己起 chromium 记得带） |
-| soffice 单实例锁 | 已开 LibreOffice 时再 open 同类文档可能无窗/卡 | 先确认 soffice 进程状态；文档打开用 `app:"libreoffice"` 走启动器语义 |
+| soffice 单实例锁 | 已开 LibreOffice 时再 open 同类文档可能无窗/卡 | 先确认 soffice 进程状态；文档打开用 `app:"libreoffice"` 走启动器语义；上次异常退出还会弹 "Document Recovery" 窗口（2026-10-18 实测），列表确认窗口时别把它当成目标文档窗 |
 | LibreOffice MIME 关联不可靠 | Fedora 把 fodt 识别成 text/xml 用编辑器打开 | `open` 必须带 `app:"libreoffice"` |
 | Qt 应用不出现在 a11y 总线 | `a11y_list_apps` 看不到 | 启动环境加 `QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1`（全局方案未装，逐应用带） |
 | Chromium/Electron a11y 树为空 | dump 不出内容 | 启动加 `--force-renderer-accessibility`（浏览器操作本走 L2，一般用不到） |

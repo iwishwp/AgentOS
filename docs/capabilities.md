@@ -56,7 +56,12 @@
   - 首跑（无代答）：读操作全通；open_app/move/close 弹 T1 横幅 30s 无人应答→超时拒绝，桌面零变动——**安全语义实证**；
   - 重跑（`org.agentos.Confirm1.Respond` 编程应答=测试通道，permissions.md §4.1）：7 步全通——开 ghostty（id 35）→移工作区 2（时间线 ws_id 5→6 即 idx 2 独立核验）→关闭→通知汇报；模型还自行用 list_workspaces 核对了 idx↔id 映射。
 - **任务 2 GUI 计算链**：水族馆开 gnome-calculator → dump 树找按钮名 → 按名点 C/4/2/×/1/0/= → 读文本得 **420** → 截图（首轮被水族馆热键浮层遮挡，模型自主定位浮层不可 a11y、借 open_app 注入 Esc 关闭，终获清净截图）。附带三个诚实发现：①同名实例寻址歧义（见矩阵）；②T2 装包无头必超时（polkit 须人）；③goose 内建 shell 扩展不经 AgentOS 策略网关（策略面只覆盖 MCP 扩展）。
-- **任务 3 文档链**：（跑后回填）
+- **任务 3 文档链**：files 读 inbox 三个零散文件（md/txt/csv，allow 免批）→ 整理写出
+  `reports/weekly-report.fodt`（flat ODF，开销合计 118 计算正确）→ `open` 带
+  `app:"libreoffice"`（T1 白名单代答 345ms 放行）→ list_windows 实证 soffice 窗口（id 40，
+  "LibreOffice 26.2" 聚焦）→ notify low + open_path 动作。视觉复核：截图见 Writer 窗口
+  渲染出周报全文与莫兰迪桌面。附带实证：上次 soffice 异常退出会弹 "Document Recovery"
+  窗口（win 41）——单实例/恢复锁现象的又一形态，已入 SKILL 坑表。
 
 ### 代答与真实点击的证据区分
 

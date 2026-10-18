@@ -35,4 +35,12 @@ copy_if_absent "$SRC/fontconfig/conf.d/01-agentos-cjk.conf" \
 copy_if_absent "$SRC/gtk-3.0/settings.ini" "$CONF/gtk-3.0/settings.ini"
 copy_if_absent "$SRC/gtk-4.0/settings.ini" "$CONF/gtk-4.0/settings.ini"
 
+# --- 无障碍基座（dconf 用户级；系统级的 QT env 已由 Containerfile 写入 /etc/environment）---
+# toolkit-accessibility=true → a11y bus IsEnabled，GTK/Chromium 都吃；Chromium 要求它
+# 在应用启动前为 true 否则永不注册 AT-SPI 总线（实测见 docs/capabilities.md 附录 B）。
+# 每次登录幂等重设（等价默认值，不与用户改动冲突——想关无障碍的用户可改 dconf 别的键）。
+if command -v gsettings >/dev/null 2>&1; then
+    gsettings set org.gnome.desktop.interface toolkit-accessibility true
+fi
+
 echo "agentos-user-setup: done (existing user files preserved)"

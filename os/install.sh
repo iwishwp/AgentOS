@@ -67,6 +67,21 @@ else
   exit 1
 fi
 
+# 1.5) 无障碍基座（agent-first 桌面的默认：AT-SPI 树对 agent 全量开放）
+# 两项均为系统级、重启持久，实测依据见 docs/capabilities.md 附录 A/B（2026-10-18）：
+#   - QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 → /etc/environment（PAM 载体，SSH/GDM 会话通吃；
+#     Qt 应用注册 AT-SPI 总线的显式保证）
+#   - toolkit-accessibility=true（dconf 用户级）→ a11y bus IsEnabled，GTK/Chromium 都吃；
+#     Chromium 要求它在应用启动前为 true，否则永不注册总线（事后开无效须重启应用）
+if ! grep -q '^QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1$' /etc/environment 2>/dev/null; then
+  echo 'QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1' | sudo tee -a /etc/environment >/dev/null
+  echo "已写入 /etc/environment: QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1"
+fi
+if command -v gsettings >/dev/null 2>&1; then
+  gsettings set org.gnome.desktop.interface toolkit-accessibility true
+  echo "已启用 toolkit-accessibility（a11y 总线对 Chromium/GTK 常开）"
+fi
+
 # 2) Node 版本检查
 NODE_MAJOR="$(node --version 2>/dev/null | sed 's/^v//' | cut -d. -f1 || true)"
 if [[ "${NODE_MAJOR:-0}" -lt 20 ]]; then

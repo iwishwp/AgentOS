@@ -1,5 +1,11 @@
 import { spawn } from "node:child_process";
 import type { CommandRunner } from "@agentos/proc";
+import {
+  NOTIFY_SHIM_PY,
+  chromiumAppArgs,
+  dbusEnv,
+  type NotifyShimParams,
+} from "./notify-action.js";
 
 export class DesktopError extends Error {}
 
@@ -24,6 +30,10 @@ export interface DesktopBins {
   notifySend: string;
   wlCopy: string;
   wlPaste: string;
+  /** 动作通知的 D-Bus shim 解释器 */
+  python3?: string;
+  /** open_url 动作用的应用窗口浏览器 */
+  chromium?: string;
 }
 
 /** 二进制可用环境变量覆盖，便于测试与发行版路径差异 */
@@ -33,19 +43,75 @@ function defaultBins(): DesktopBins {
     notifySend: process.env["NOTIFY_SEND_BIN"] ?? "notify-send",
     wlCopy: process.env["WL_COPY_BIN"] ?? "wl-copy",
     wlPaste: process.env["WL_PASTE_BIN"] ?? "wl-paste",
+    python3: process.env["PYTHON3_BIN"] ?? "python3",
+    chromium: process.env["CHROMIUM_BIN"] ?? "chromium-browser",
   };
 }
 
+/** 动作通知 shim 的 stdout 事件（每行一个 JSON） */
+export interface ShimEvent {
+  sent?: boolean;
+  id?: number;
+  error?: string;
+  invoked?: boolean;
+  reason?: string;
+}
+
+/** 长 lived shim 进程的抽象（真实现 spawn python3；测试注入替身） */
+export type ShimProc = { kill(): void };
+export type ShimSpawn = (
+  cmd: string,
+  args: string[],
+  opts: { input: string; env: Record<string, string>; onLine: (e: ShimEvent) => void; onExit: (code: number | null) => void },
+) => ShimProc;
+
+function defaultShimSpawn(
+  cmd: string,
+  args: string[],
+  opts: { input: string; env: Record<string, string>; onLine: (e: ShimEvent) => void; onExit: (code: number | null) => void },
+): ShimProc {
+  const child = spawn(cmd, args, {
+    stdio: ["pipe", "pipe", "ignore"],
+    env: { ...process.env, ...opts.env },
+  });
+  let buf = "";
+  child.stdout?.on("data", (d: Buffer) => {
+    buf += d.toString("utf8");
+    let nl: number;
+    while ((nl = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (line === "") continue;
+      try {
+        opts.onLine(JSON.parse(line) as ShimEvent);
+      } catch {
+        // shim 的非 JSON 输出（警告等）忽略
+      }
+    }
+  });
+  child.on("error", () => opts.onExit(null));
+  child.on("close", (code) => opts.onExit(code));
+  child.stdin?.write(opts.input);
+  child.stdin?.end();
+  return { kill: () => child.kill() };
+}
+
 /**
- * 桌面交互客户端：打开目标（系统默认应用）、桌面通知、剪贴板读写。
- * 依赖系统包：xdg-utils、libnotify(notify-send)、wl-clipboard；通知守护进程（如 mako）。
+ * 桌面交互客户端：打开目标（系统默认应用）、桌面通知（含动作型）、剪贴板读写。
+ * 依赖系统包：xdg-utils、libnotify(notify-send)、wl-clipboard、python3+PyGObject
+ * （动作通知 shim）、通知守护进程（如 mako）。
  */
 export class DesktopClient {
+  private readonly bins: DesktopBins;
   constructor(
     private readonly runner: CommandRunner,
-    private readonly bins: DesktopBins = defaultBins(),
+    bins: DesktopBins = defaultBins(),
     private readonly detach: DetachFn = defaultDetach,
-  ) {}
+    private readonly spawnShim: ShimSpawn = defaultShimSpawn,
+  ) {
+    // 与缺省合并：注入方可只覆盖关心的键（向后兼容旧测试的 BINS 字面量）
+    this.bins = { ...defaultBins(), ...bins };
+  }
 
   async open(target: string): Promise<void> {
     if (!target.trim()) {
@@ -86,6 +152,61 @@ export class DesktopClient {
     if (r.code !== 0) {
       throw new DesktopError(`notify-send 失败: ${describe(r)}（libnotify 装了吗？通知守护进程 mako 在跑吗？）`);
     }
+  }
+
+  /**
+   * 动作型通知：发一条带默认动作（"点击即触发"）的 D-Bus 通知。
+   * 返回投递结果：python3/gi/通知守护进程任一不可用 → "fallback"（调用方降级为
+   * 普通 notify-send，正文带目标地址）。点击与否不阻塞本调用：终态事件异步回调
+   * onResult（invoked=true 才有业务意义；dismissed/expired/timeout 仅收尾）。
+   */
+  notifyAction(
+    params: NotifyShimParams & { actionLabel?: string },
+    onResult: (outcome: { invoked: boolean; reason?: string }) => void,
+  ): Promise<{ delivered: "action"; notifId?: number } | { delivered: "fallback"; reason: string }> {
+    return new Promise((resolve) => {
+      let settled = false;
+      let firstEvent = true;
+      this.spawnShim(
+        this.bins.python3 ?? "python3",
+        ["-c", NOTIFY_SHIM_PY],
+        {
+          // shim 是 python（snake_case）：这里做一次键名转换，VM 实测曾因 camelCase
+          // 键 KeyError 崩在 watchdog 注册（notify-action 的教训）
+          input: JSON.stringify({
+            summary: params.summary,
+            body: params.body,
+            urgency: params.urgency,
+            timeout_ms: params.timeoutMs,
+            wait_ms: params.waitMs,
+            action_label: params.actionLabel,
+          }),
+          env: dbusEnv(),
+          onLine: (e) => {
+            if (firstEvent) {
+              firstEvent = false;
+              settled = true;
+              if (e.sent) resolve({ delivered: "action", notifId: e.id });
+              else resolve({ delivered: "fallback", reason: e.error ?? "notify shim 未送达" });
+              return;
+            }
+            if (e.invoked === true) onResult({ invoked: true });
+            else if (e.invoked === false) onResult({ invoked: false, reason: e.reason });
+          },
+          onExit: (code) => {
+            if (!settled) {
+              settled = true;
+              resolve({ delivered: "fallback", reason: `shim 退出（code ${code ?? "null"}）` });
+            }
+          },
+        },
+      );
+    });
+  }
+
+  /** URL 以 chromium 应用窗口呈现（--password-store=basic 必带，M3 教训） */
+  openUrl(url: string): void {
+    this.detach(this.bins.chromium ?? "chromium-browser", chromiumAppArgs(url));
   }
 
   async clipboardRead(): Promise<string> {

@@ -14,13 +14,25 @@
 2. **呈现方式选择**：
    - 仪表盘/报告页/交互内容 → **canvas 生成式 UI**：用 `files__write_file` 把自包含单文件 HTML
      （内联 CSS/JS，不引外部资源）写到 `canvas/<名字>/index.html`，再用 `desktop__open` 打开
-     `http://127.0.0.1:7788/<名字>/`；索引页 `http://127.0.0.1:7788/` 可回看历史；
+     `http://127.0.0.1:7788/<名字>/`；
    - office 文档（fodt/docx/odt 等）→ `desktop__open` 带 `app: libreoffice` 参数
      （系统 MIME 关联不可靠，实测 Fedora 把 fodt 识别成 text/xml）；
    - 网页内容 → 浏览器；
    - 向用户展示/讲解键位 → `desktop__open` 打开 `http://127.0.0.1:7788/keys`
      （键位速查页，与用户按 Super+K 看到的同一页，实时反映 niri 配置）；
-3. 任务完成、失败、或需要用户决策时，用 `desktop__notify` 发通知（标题一句话说清结论）。
+3. **产物索引与回看**：`http://127.0.0.1:7788/artifacts` 是全工作区产物索引（网页在线看 /
+   文档图片列出 / 数据影音可下载），产物只要落了位就会出现在那里，不需要额外登记；
+   用户问"我上次的报告在哪"时打开这个页面或直接报相对路径；
+4. **通知三档契约**（`desktop__notify`，异步结果一律通知用户，不要默默完成）：
+   - **任务完成** → `urgency: "low"` + `action`（查看产物直达）：HTML 产物用
+     `{kind: "open_url", url: "http://127.0.0.1:7788/<名字>/"}`；文件产物用
+     `{kind: "open_path", path: "reports/<名字>.fodt"}`（工作区相对路径；office 文档会
+     自动走 LibreOffice）。用户点击通知本体即打开产物；
+   - **任务失败/需要用户尽快知道** → `urgency: "critical"`，标题一句话说清结论，正文给
+     原因与下一步建议；完成产物但有问题时也可附 action 方便用户验收；
+   - **需要用户决策/确认** → **不用 notify**，走 `desktop__confirm`（T1 四横幅通道，
+     notify 没有选择语义）；
+   - 通知动作通道不可用时 notify 会自动降级为正文带目标地址的普通通知，如实告知用户即可。
 
 ## 浏览器操作（水族馆内）
 

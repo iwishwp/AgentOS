@@ -31,6 +31,12 @@ spawn-at-startup "qs" "-c" "noctalia"
 // goose 悬浮球（常驻：干活进展 + 待确认提醒，安装见 scripts/install-orb.sh，设计 docs/orb.md）
 spawn-at-startup "qs" "-c" "agentos-orb"
 
+// goose desktop（Electron 图形版，用户交互首要入口）：内置 goose CLI（ACP），
+// 与 goose TUI 共用 ~/.config/goose/config.yaml（MCP 扩展/GLM provider）。
+// 启动器注入 goose.env 密钥 + Wayland/a11y 参数（keyring 坑见 docs/goose-desktop.md）；
+// RPM 包（Goose-1.55.0-1.arm64）需 Mac 中转安装，见同文。路径按部署机用户名调整
+spawn-at-startup "/home/demon/AgentOS/scripts/launch-goose-desktop.sh"
+
 // 美学配置（布局/动画/色板），见 os/configs/theming/niri/aesthetics.kdl
 // include 语义为文档拼接：layout 与 animations 段只在那个文件里定义，勿在此重复
 include "./aesthetics.kdl"
@@ -53,6 +59,9 @@ binds {
     // 启动器（fuzzel）：Omarchy 的 Super+Space（Omarchy menu）键位原样采纳，
     // 菜单实现换成我们实际用的 fuzzel
     Super+Space { spawn "agentos-launcher"; }
+
+    // 唤起 goose desktop（首要对话入口；再次启动走 Electron 单实例锁 → 聚焦已有窗口）
+    Super+G hotkey-overlay-title="Goose" { spawn "/home/demon/AgentOS/scripts/launch-goose-desktop.sh"; }
 
     // 启动器别名：niri 默认 Mod+D 保留
     // 启动器统一入口：Noctalia 启动面板（与状态栏同款），回退 fuzzel（scripts/agentos-launcher.sh）

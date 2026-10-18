@@ -212,6 +212,13 @@ worktree `feat/goose-e2e-skill`（测试 229 基线不动，全绿）。三件�
 
 ## 2026-10-18（深夜）
 
+- **ghostty 已开窗口热重载打通（修正前论）**：用户实测菜单重载能换色 → 推翻"palette
+  属 surface 级"定论；受控实验证明根因是**文件监视器不触发**（配置已变、窗口不变）。
+  方案：theme-apply-all 内置 reload_ghostty_windows——niri 轮询 ghostty 窗口 + wtype
+  注入 ctrl+shift+,（用户级），焦点还原；终验已开窗口暗↔浅自动换色。
+- **悬浮球收起修复**：面板 400px 盖住球体导致无法收起——面板右上角加 × 收起按钮。
+
+
 - **悬浮球服务化**：`os/systemd/agentos-orb.service`（Restart=on-failure）——手动拉起的
   进程悄悄死过一次，systemd 接管后自愈；ghostty 热重载定论：palette 属 surface 级，
   两条重载路径已开窗口均不换色（如实修正 theming 表述）。

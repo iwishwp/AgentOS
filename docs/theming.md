@@ -137,7 +137,7 @@ mako/fuzzel/浮层两档均实测同族跟随。
 | 状态栏/面板（Noctalia） | watchChanges 热重载 colors.json | 即时 |
 | mako 通知 | theme-mako.sh 内置 makoctl reload | 即时 |
 | fuzzel 启动器 | 每次唤起读配置 | 下次打开 |
-| ghostty 终端 | **新开窗口生效**；已开窗口不跟随——实测两条路（配置文件变更监视 + 手动 ctrl+shift+, 重载）已开表面均不换色，palette 属 surface 级配置（ghostty 上游已知行为） | 新窗口 |
+| ghostty 终端 | **已开窗口可热重载**：theme-apply-all 自动注入默认键 ctrl+shift+,（wtype，用户级无需 sudo）→ 已开表面即时换色（2026-10-18 用户发现菜单重载有效，实测打通；根因是 ghostty 文件监视器不触发，非 surface 级限制——此前定论已修正） | 即时 |
 | GTK 应用 | 暗/亮跟随 gsettings 即时（libadwaita 内建）；**命名色覆盖（gtk.css）只对新进程生效**，已开应用不重读 | 暗/亮即时、调色板重启 |
 | canvas 三页 | 刷新页面（F5） | 手动 |
 | 键位浮层/悬浮球 | 按键时起进程读色板，重开即新配色 | 下次触发 |

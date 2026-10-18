@@ -337,6 +337,25 @@ ShellRoot {
 
         MouseArea { anchors.fill: parent; onClicked: {} } // 点面板本体不收起
 
+        // 显式收起按钮（面板会盖住球，球点不到——这是唯一可靠收起入口之一）
+        Rectangle {
+          width: 30; height: 30; radius: 15
+          anchors.top: parent.top; anchors.topMargin: 10
+          anchors.right: parent.right; anchors.rightMargin: 10
+          color: root.withAlpha(root.colors.surface_container_highest, 0.9)
+          border.width: 1
+          border.color: root.withAlpha(root.colors.outline_variant, 0.6)
+
+          Text {
+            anchors.centerIn: parent
+            text: "×"
+            color: root.colors.on_surface
+            font.pixelSize: 16
+          }
+
+          MouseArea { anchors.fill: parent; onClicked: root.panelOpen = false }
+        }
+
         Column {
           id: panelCol
           anchors.fill: parent

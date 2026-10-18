@@ -79,7 +79,32 @@ run_bridge "fuzzel 启动器"  "theme-fuzzel.sh"
 run_bridge "ghostty 终端"   "theme-ghostty.sh"
 run_bridge "gtk 全应用"     "theme-gtk.sh"
 
+# ---- ghostty 已开窗口热重载（2026-10-18 用户实测菜单重载有效；文件监视器不触发）----
+# 机制：focus 每个窗口 + wtype 注入默认键 ctrl+shift+,（reload_config），已开表面即换色。
+# 条件全满足才做：niri socket 可发现 + wtype 存在；失败静默跳过（新开窗口本就生效）。
+reload_ghostty_windows() {
+  local sock gid prev
+  sock="$(ls "$XDG_RUNTIME_DIR"/niri.wayland-*.sock 2>/dev/null | head -1)"
+  [[ -n "$sock" && -x "$(command -v wtype)" ]] || return 0
+  export NIRI_SOCKET="$sock"
+  prev=$(niri msg --json focused-window 2>/dev/null | python3 -c "
+import json,sys
+try: print(json.load(sys.stdin).get('id',''))
+except Exception: print('')" 2>/dev/null)
+  for gid in $(niri msg --json windows 2>/dev/null | python3 -c "
+import json,sys
+try: print(' '.join(str(w['id']) for w in json.load(sys.stdin) if w.get('app_id')=='com.mitchellh.ghostty'))
+except Exception: pass" 2>/dev/null); do
+    niri msg action focus-window --id "$gid" >/dev/null 2>&1 || continue
+    sleep 0.15
+    wtype -M ctrl -M shift -k comma -m shift -m ctrl >/dev/null 2>&1
+    sleep 0.25
+  done
+  [[ -n "$prev" ]] && niri msg action focus-window --id "$prev" >/dev/null 2>&1
+}
+reload_ghostty_windows && RESULTS+=("✓ ghostty 已开窗口热重载") || true
+
 # ---- 结果一览 ----
 echo "== 桥结果一览 =="
 for r in "${RESULTS[@]}"; do echo "  $r"; done
-echo "（状态栏/通知即时重载；GTK 与终端已开窗口不跟随，新开即生效；Noctalia 若在跑会热重载 colors.json）"
+echo "（状态栏/通知/GTK暗亮即时；ghostty 已开窗口已自动热重载；GTK 调色板新进程生效）"

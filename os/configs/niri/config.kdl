@@ -18,6 +18,11 @@
 // default-config.kdl 里拷贝对应行。
 
 // 通知守护进程（desktop-mcp 的通知工具依赖它）
+// 开机不再弹内置速查浮层（速查走 Super+K 我们的浮层；内置版仍可 Mod+Shift+Slash 手动唤起）
+hotkey-overlay {
+    show-at-startup false
+}
+
 spawn-at-startup "mako"
 
 // polkit 认证代理（M4 T2 装包链的密码弹窗；QT_LINUX_ACCESSIBILITY_ALWAYS_ON

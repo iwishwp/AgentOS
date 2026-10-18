@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
+# 【已收编】编排职责已移交 packages/settings-daemon（TS 常驻进程，watcher 自动触发）；
+# 本脚本保留作遗留兼容/单桥排查入口，逻辑与 TS 桥字节级对拍一致（见其 test/bridges.test.ts）。
 # scripts/theme-gtk.sh —— GTK 桥：全部 GTK3/4 应用吃上系统莫兰迪色板
 #
 # 覆盖面最大的桥（gnome-calculator/文件管理器/编辑器等所有 GTK 应用）。方式：

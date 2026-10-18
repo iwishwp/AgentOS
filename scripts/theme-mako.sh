@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
+# 【已收编】编排职责已移交 packages/settings-daemon（TS 常驻进程，watcher 自动触发）；
+# 本脚本保留作遗留兼容/单桥排查入口，逻辑与 TS 桥字节级对拍一致（见其 test/bridges.test.ts）。
 # scripts/theme-mako.sh —— 通知样式对齐系统主题（莫兰迪）
 #
 # mako 配置极简，不支持变量；本脚本从 Noctalia 色板（colors.json，换壁纸重生成后

@@ -9,7 +9,7 @@
 |---|---|---|---|
 | **M0** | 奠基 | 1–2 周 | ✅ 一句话让 agent 开应用、摆窗口、报系统状态（2026-10-15 达成） |
 | **M1** | 系统工具面 | 2–4 周 | ✅ 纯对话完成“下载→整理→生成文档→调起 LibreOffice”（2026-10-15 达成） |
-| **M2** | 呈现层 | 3–4 周 | 任务产物统一进 artifacts 可回看；双通道呈现可用 |
+| **M2** | 呈现层 | 3–4 周 | ✅ 所有任务产物统一进 artifacts 可回看；双通道呈现可用（2026-10-18 达成） |
 | **M3** | agent 会话 | 4–6 周 | ✅ 独立会话完成真实表单提交 + GUI 应用操作，零干扰（2026-10-16 达成） |
 | **M4** | 信任与安全 | 3–4 周 | ✅ 凭据零明文进上下文；误操作可回滚、可回放（2026-10-17 达成） |
 | **M5** | 发行 | 2–4 周 | 全新机器 30 分钟从 ISO/脚本到可用对话 |
@@ -57,7 +57,7 @@ app=libreoffice，窗口验证 soffice 26.2）→ 通知"。意外收获：给�
 
 退出标准：不碰键盘鼠标，纯对话完成"下载文件 → 整理到工作区 → 生成一份文档 → 调起 LibreOffice 展示"。**已达成。**
 
-## M2 呈现层（进行中 · 核心已通）
+## M2 呈现层（✅ 2026-10-18 完成）
 
 **目标**：agent 决定“怎么给用户看”，确立 artifacts 产品概念。
 
@@ -67,12 +67,34 @@ app=libreoffice，窗口验证 soffice 26.2）→ 通知"。意外收获：给�
   仅绑 127.0.0.1；✅ **已落地并真机验证**（2026-10-15：agent 采集真实系统数据生成深色
   仪表盘 → canvas 托管 → 浏览器呈现，生成式 UI 闭环打通）。systemd 单元
   `os/systemd/agentos-canvas.service` 已部署；
-- artifacts 仓库：任务化索引与历史回看——canvas 索引页已覆盖 HTML 类；⬜ 全类型
-  artifacts（文件/报告）的统一索引待做；
-- 通知联动：完成/失败/需确认三类通知 + “查看产物”动作；⬜ 动作型通知待 mako 配置探索；
+- **artifacts 仓库：任务化索引与历史回看 ✅（2026-10-18）**：`/api/artifacts` +
+  `/artifacts` 索引页——扫描整个工作区（AGENTOS_WORKSPACE，与 files-mcp 同一
+  约定），全类型呈现（网页在线看 / 文档图片由 agent 桌面打开 / 数据影音下载），
+  realpath 越界防护 + .trash 排除沿用 canvas 纪律；VM 实测 24 个真实产物六类
+  全命中 + 浏览器截图复核（详录 real-machine.md 当日条目）；
+- **通知联动 ✅（2026-10-18）**：完成/失败/需确认三档契约入档 goose-system.md
+  （完成=低紧急度+查看产物动作；失败=critical；需确认走 confirm 工具）；
+  `desktop__notify` 支持可选 `action`（open_url/open_path），内联 python3 D-Bus
+  shim 发带默认动作的通知并监听 ActionInvoked——mako 1.11 无按钮，点击通知本体
+  即触发（真实点击待用户复核，编程路径 fr.emersion.Mako.InvokeAction 已实证）；
+  点击后 chromium --app / soffice（office 白名单）打开产物并写审计
+  （tool=notify_action）；动作通道不可用自动降级为正文带地址的普通通知；
 - office 链路：✅ M1 已实证（fodt 生成 + LibreOffice 展示）。
 
-退出标准：所有任务产物统一进 artifacts 且可回看；外发格式与生成式 UI 两条呈现通道可用。
+**完成记录（2026-10-18，Fedora aarch64 @ VMware Fusion VM 实测）**：
+- **artifacts 统一索引** ✅：curl /api/artifacts 200（真实工作区 24 产物、六类
+  分类正确、.trash/隐藏/外链排除）；越界 404、下载双文件名；/artifacts 页面
+  chromium+grim 截图经视觉模型复核（莫兰迪、分组卡片、类型徽章、五列表格、
+  过滤框，无渲染异常）；
+- **动作型通知** ✅：两条全链路（open_path→soffice 窗口出现、open_url→chromium
+  拉起）+ 审计 notify_action 行留证；期间修掉 shim 键名不一致（camelCase→
+  snake_case，watchdog 注册即崩）与 makoctl invoke 静默空转（改走 mako 私有
+  接口 InvokeAction，default 与具名动作均触发 ActionInvoked）两个实测问题；
+  mako 真实点击无法以合成输入证实（ydotool 绝对定位受加速度影响、uinput
+  ABS/触摸屏 niri 不消费——输入层限制非 mako 结论），正文带地址的降级约定
+  已内建，真实点击与 M4 横幅点选同批留待用户在场复核。
+
+退出标准：所有任务产物统一进 artifacts 且可回看；外发格式与生成式 UI 两条呈现通道可用。**已达成（2026-10-18）。**
 
 ## M3 agent 会话（✅ 2026-10-16 完成）
 

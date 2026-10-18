@@ -353,3 +353,59 @@ goose session
     Permission denied，须 `sudo -S env YDOTOOL_SOCKET=… ydotool …`；③ 同机并行
     任务隔离可复现——对 niri 配置只做 Super+K 块的定点替换（python 断言唯一匹配
     后 replace），另一任务的 ghostty 改动原样保留并被键位页正确读取。
+
+- **2026-10-18 M2 收尾 ✅（artifacts 全类型索引 + 动作型通知）**：在 fedora（192.168.54.130，即 M4/M5 主力 VM）实测，两轮验证均留证：
+
+  **artifacts 全类型索引**：
+  - 部署 canvas 新代码 + 重启 agentos-canvas → `curl /api/artifacts` 200，
+  真实工作区 24 个产物全量命中，六类（网页/文档/图片/数据/影音/其他）各就各位
+  （canvas/status HTML、reports/task-report.fodt、m4-evidence PNG、
+  recordings mkv、downloads 杂项…）；
+  - 沙箱复核：`../` 越界 404、`.trash` 404、下载模式 200 + 双文件名
+  content-disposition；
+  - 浏览器截图（chromium --app + grim，视觉模型复核）：莫兰迪深色底、
+  顶栏（标题+副标题"全类型扫描 /home/demon/Agent · 24 个产物"+导航
+  canvas 首页/键位/回放）、按目录分组卡片（canvas/reports/recordings/
+  m4-evidence/screenshots/notes/inbox 各带计数）、每行五列
+  （名称+目录/类型徽章/大小/时间/操作）、文档行"agent 打开"提示、
+  过滤框可见，无渲染异常。
+
+  **动作型通知（"查看产物"）**：
+  - **mako 点击触发 default 动作：无法以合成输入证实（环境限制，非 mako 结论）**。
+  三路合成输入全部失败在输入层而非 mako：① ydotool 1.0.4 `mousemove -a`
+  是加速度敏感的模拟绝对定位（其 help 自己警告），落点漂移——对 EULA
+  对话框"取消"按钮与通知横幅全区域扫描点击（y=15..95）均无反应；
+  ② uinput 真 ABS 指针设备 libinput 认了（Capabilities: pointer）但
+  niri/smithay 不消费绝对指针轴；③ uinput 单点触摸屏协议同样无效。
+  真实点击仍待用户在场复核（与 M4 横幅点选同批遗留）。
+  - **编程触发路径实证（信号等价于点击）**：`makoctl invoke <id> <action>`
+  在本机 mako 1.11 是**静默空转**（任意 id/动作 rc=0、无 D-Bus 信号，
+  对不存在的 id 也 rc=0——M4 记录"makoctl invoke 可发 ActionInvoked"
+  与本机行为不符，修正为下述直接调用）；正确姿势是 mako 私有接口：
+  ```
+  OWNER=$(gdbus call --session --dest org.freedesktop.DBus --object-path /org/freedesktop/DBus \
+          --method org.freedesktop.DBus.GetNameOwner org.freedesktop.Notifications)  # → :1.24
+  gdbus call --session --dest $OWNER --object-path /fr/emersion/Mako \
+          --method fr.emersion.Mako.InvokeAction <notif-id> default   # 或具名 open
+  ```
+  default 与具名 open 均触发 ActionInvoked（gdbus monitor 留证）；因此
+  shim 的动作表同时带 `default`（给真实点击）与 `open`（给自动化）。
+  - **全链路两轮 ✅**（直连 desktop-mcp，不经 goose；点击用上述 InvokeAction
+  等价触发）：
+  - open_path：notify(action: reports/task-report.fodt) → 通知带"查看产物"
+    动作 → InvokeAction → ActionInvoked → handler → **soffice 窗口出现**
+    （niri msg windows 见 LibreOffice/soffice）+ 审计
+    `notify_action allow open_path(soffice) reports/task-report.fodt`；
+  - open_url：notify(action: /artifacts) → 同链路 → chromium 7 进程拉起 +
+    审计 `notify_action allow open_url http://127.0.0.1:7788/artifacts`。
+  - **两个工程教训**：① Node→python shim 的参数键名必须统一 snake_case
+  （首测 camelCase 键让 shim 崩在 watchdog 注册——通知已显示但点击永远
+  无人应答，已修+防回归断言）；② soffice 单实例锁陷阱——首次在无
+  WAYLAND_DISPLAY 的 ssh 环境里拉起的 soffice.bin 会占锁，之后带环境的
+  调用全部转发给它而永不开窗，须 pkill 重拉（生产路径经 goose 用户服务
+  有 Wayland 环境，不受影响）。
+  - **VM 环境遗留（非本改动引入）**：默认 profile 的 chromium 会话卡在
+  首启 EULA 对话框（M5 点亮遗留，工作区 4），会吞掉 --app 类新窗口请求
+  （转发进旧会话）；验证页面渲染时用 `--user-data-dir=/tmp/...` 独立
+  profile 绕开。另注意 makoctl list 里可能混入 GNOME Software 的更新
+  通知，抓 id 时必须按 summary 过滤（本次误 invoke 过一次，无副作用）。

@@ -6,6 +6,34 @@
 
 ---
 
+## 2026-10-18
+
+- **M2 呈现层 ✅ 关账**（worktree `feat/m2-finish`，测试 194 → **229 全绿**）：最后两项
+  落地并 VM 实测（详录 real-machine.md 当日条目）——
+  - **artifacts 全类型统一索引**（`ec896ea`）：canvas 新增 `/api/artifacts`（扫描整个
+    工作区，与 files-mcp 同一 AGENTOS_WORKSPACE 约定）+ `/artifacts` 索引页（莫兰迪、
+    按目录分组、类型徽章、过滤框，/keys 同款骨架）；呈现通道按类型分：网页/图片在线看、
+    文档提示由 agent `desktop__open` 打开、数据/影音可下载（`/api/artifacts/file` 带
+    realpath 沙箱与 .trash 排除）；首页加三页互通导航。VM 实测 24 个真实产物六类全命中，
+    截图经视觉模型复核无渲染异常；
+  - **动作型通知"查看产物"**（`a00a64f`/`4b5c779`）：`desktop__notify` 增加可选
+    `action`（open_url/open_path），内联 python3 D-Bus shim 发带 default+open 动作的
+    通知并监听 ActionInvoked（agentos-confirm.py 同模式）；点击后 chromium --app /
+    soffice（office 白名单）打开产物并写审计 `notify_action`；通道不可用自动降级为
+    正文带地址+「对我说打开」约定。通知三档契约（完成=low+动作/失败=critical/需确认
+    走 confirm）入档 goose-system.md。VM 全链路两轮实证（open_path→soffice 窗口、
+    open_url→chromium 拉起，审计行留证）；
+  - **两个实测新知**：① mako 1.11 的 `makoctl invoke` 在本机是静默空转（任意 id/动作
+    rc=0 无信号）——编程触发必须走 mako 私有接口 `fr.emersion.Mako.InvokeAction`
+    （default 与具名动作均可触发 ActionInvoked，gdbus monitor 留证；M4 记录据此修正）；
+    ② mako 真实点击无法以合成输入证实：ydotool 1.0.4 `-a` 绝对定位受指针加速度影响
+    落点漂移（help 自警），uinput 真 ABS 指针/单点触摸屏 niri 不消费——输入层限制，
+    非 mako 结论，与 M4 横幅点选同批留待用户在场复核；
+  - **工程教训**：跨语言 shim 的参数键名要统一（Node camelCase → python snake_case
+    不一致曾让 watchdog 注册即崩：通知显示正常但点击永远无人应答，最狡猾的失败形态）；
+    soffice 单实例锁会在无显示环境首启时被占死，后续调用全部转发不开窗，ssh 驱动
+    GUI 验证必须带 WAYLAND_DISPLAY。
+
 ## 2026-10-17
 
 单日四线并行（主线 + 3 个后台子代理 worktree），测试 129 → **194 全绿**。

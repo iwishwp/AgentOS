@@ -20,6 +20,16 @@ export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
 export XDG_CURRENT_DESKTOP=niri XDG_SESSION_TYPE=wayland
+# NIRI_SOCKET 必须带（2026-10-18 实测坑）：Noctalia 启动器点应用走
+# CompositorService.spawn → niri 后端 `niri msg action spawn --`，缺此变量则
+# 每次点击都无声失败（报错进 detached 子进程 stderr 无人接收）——表现为
+# "启动器里所有应用都打不开"。
+NIRI_SOCK="$(ls "$XDG_RUNTIME_DIR"/niri.wayland-*.sock 2>/dev/null | head -1)"
+if [[ -n "$NIRI_SOCK" ]]; then
+  export NIRI_SOCKET="$NIRI_SOCK"
+else
+  echo "警告: 未发现 niri socket（不在 niri 会话？启动器应用启动将失效）" >&2
+fi
 
 mkdir -p "$(dirname "$LOG")"
 setsid sh -c "stdbuf -oL -eL qs -c noctalia 2>&1 \

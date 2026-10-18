@@ -6,6 +6,27 @@
 
 ---
 
+## 2026-10-18（晚追加：视觉语言统一第一批——fuzzel + Super+K 浮层）
+
+worktree `feat/visual-unify`。两交付，全部 VM 实拍像素级验证：
+
+- **fuzzel 启动器主题化 ✅**（`scripts/theme-fuzzel.sh`，模式同 theme-mako.sh：colors.json
+  取色、AGENTOS_COLORS_JSON 可覆盖、lanrhyme 同值兜底）：奶油白默认配色 → 莫兰迪卡片
+  （底 #37362f 94%、选中 #3d3b34、匹配高亮 primary、描边 #6c6a61、圆角 12、anchor=top
+  顶部居中悬浮）。**两个 fuzzel 1.14 的坑**：圆角/描边在独立 `[border]` 小节（[main]
+  里写 border-radius 会报 not a valid option 且疑似中断后续解析）；颜色**只认 8 位
+  #RRGGBBAA**，6 位静默回落默认色（第 1 轮描边一直渲染 #002b36 定位了半天才明）。
+- **Super+K 浮层重做 ✅**（`os/configs/hotkeys/shell.qml`）：近全屏面板（用户否决态）
+  → **顶部居中悬浮卡片**：宽 min(50%, 680)、高 min(68%, 余量)、topMargin 64（状态栏
+  37px 下留 27px）、圆角 12 / 描边 2px / 底 93% surface_container——与 mako/fuzzel 同
+  档位。行式保留"键列 + 固定起点箭头说明列"，配色结构对齐 Omarchy（键列中性白 DemiBold
+  mono，箭头+说明 primary）。**交互坑**：翻页键原先挂在 ListView 的 Keys 上，但它没有
+  焦点（焦点在全屏 Item）→ PageDown 失效；合并到焦点 Item 统一操作 contentY 即好。
+  另：ydotool 发 Super+K 的 K 是 **37**（45 是 X），发错键会误判"浮层秒退"。
+- **视觉语言规范雏形**写入 docs/theming.md §7（圆角/描边/底色/强调四档位），为后续
+  mako（已达标）/orb/canvas 收口做底。
+- 测试：229 基线不动全绿（只动 QML/shell 脚本/docs）。
+
 ## 2026-10-18（下午追加：goose 端到端 + 能力矩阵 + 通用 skill）
 
 worktree `feat/goose-e2e-skill`（测试 229 基线不动，全绿）。三件事：

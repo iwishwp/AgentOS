@@ -1,6 +1,9 @@
 # goose 接入说明
 
 > niri-mcp 是一个 stdio MCP server，任何 MCP 客户端都能挂载；本文以 goose 为例（我们默认的 agent 引擎）。
+> 图形版（goose desktop，Electron）已作为用户交互首要入口落地，安装/自启/踩坑见
+> [goose-desktop.md](goose-desktop.md)——它内置的 goose CLI 读同一份 config.yaml，
+> 本文的扩展配置对 TUI 与 desktop 同时生效。
 
 ## 安装 goose
 

@@ -6,6 +6,41 @@
 
 ---
 
+## 2026-10-18（深夜追加四：goose desktop 落地——首要用户入口 + 两枚深坑定论）
+
+worktree `feat/goose-desktop`。目标：goose 图形版开机自启，成为与用户对话的首要入口。
+
+- **调研**：上游 `block/goose` → `aaif-goose/goose`（API 301 实证）。desktop =
+  Electron Forge + Vite + React（`ui/desktop/`），运行时内置 goose CLI 经 ACP
+  （`goose serve --tls --platform desktop`）驱动，与 TUI 共用
+  `~/.config/goose/config.yaml`。v1.55.0（10-16 发布）**有 Linux aarch64 官方
+  RPM/deb/Flatpak**——不存在"要自建/要 TUI 替代"的问题。走 RPM（155MiB 中转 scp，
+  落盘 598MiB，VM 余 6.8G）。
+- **坑一（keyring）**：GDM autologin → login keyring 永锁 → desktop 启动即弹
+  gcr 解锁框，serve 就绪探测 30s 超时（"Goose Failed to Start"）。双层解：
+  `--password-store=basic`（safeStorage 不走 libsecret）+ 移走锁死的
+  `login.keyring`（备份 `.bak-20261018`；内含为空、密码非登录密码——123456 实测
+  不对，a11y 桥输密码点 Unlock 亲测报"密码错误"）。
+- **坑二（Electron 原生 Wayland）**：窗口现象级消失——进程全活、serve 249ms 就绪、
+  renderer `visibilityState=visible`，唯独 `get_xdg_surface` 永不发出
+  （WAYLAND_DEBUG 定论）→ niri 永不映射。排除法烧了整个晚上（env 内容/stdio/
+  fd 上限/setsid/cgroup/seccomp/disable-gpu/activation token 全部无关；期间
+  /tmp kill 脚本重启蒸发导致单实例锁把测试变 second-instance，污染了半数结论）。
+  单变量定论：**`XDG_SESSION_TYPE=wayland`+hint=auto 选中 wayland 后端即触发；
+  X11 路径（Xwayland-satellite）100% 出窗**。wrapper 固定 `--ozone-platform=x11`。
+  上游修复前不再碰原生 Wayland。
+- **落地**：`scripts/launch-goose-desktop.sh`（goose.env 注入 + x11 + a11y +
+  basic 密钥库四合一）；niri `spawn-at-startup` 自启 + `Super+G` 唤起（Electron
+  单实例 → 二次启动聚焦，实测）；重启验证：窗口自动出现并聚焦、状态栏 goose
+  图标正常（app_id 小写 `goose`，X11 来自 WM_CLASS）。
+- **端到端**：CDP（`ENABLE_PLAYWRIGHT=1`+`--remote-allow-origins=*`）驱动 desktop
+  发"用 niri 扩展列出所有窗口"→ **List Windows** 工具执行 → glm-5.3-flash 回复
+  正确列表。MCP 扩展零改动两端共用。a11y：树可读（菜单/文档/会话结构），
+  点击派发同 Chromium 限制不执行——驱动归 CDP，与昨日 a11y 结论一致。
+- 文档：新建 `docs/goose-desktop.md`（调研/安装/双坑实录/验证记录全量）。
+
+---
+
 ## 2026-10-18（深夜追加三：a11y 覆盖长尾——Qt/Chromium/X11 定论 + 注入升级）
 
 worktree `feat/a11y-coverage`。目标：把能力矩阵 L1 的 ⚠️/❌ 清干净——每格 VM 实测定论。

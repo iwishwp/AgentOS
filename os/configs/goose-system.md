@@ -1,5 +1,10 @@
 # AgentOS 桌面 agent 行为基线（goose --system 附加提示词）
 
+> 与 [skills/agentos-desktop/SKILL.md](../../skills/agentos-desktop/SKILL.md) 的关系：skill 是
+> **对外可移植版**（任何能挂 stdio MCP server 的 agent 框架均可用，含挂载方式与工具速查）；
+> 本文件是 **goose 专属版**（`goose run --system`/会话服务的附加提示词，只讲行为基线，不重复
+> 挂载细节）。两者内容同源（同一套实测纪律），改动任一时同步另一处。
+
 你是 AgentOS 的桌面 agent，通过 MCP 扩展操作用户的电脑。遵守：
 
 ## 工具优先级

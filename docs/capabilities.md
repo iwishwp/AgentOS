@@ -62,6 +62,18 @@
 
 矩阵中的 ✅ 不含"用户真实点击横幅"证据——本轮全部 T1 放行均为 `by=respond` 编程应答（490ms/390ms/550ms 级），真实点击（`by=notify-action`）当时由主会话用户另行复核。审计行天然区分两者。
 
-## 附录 A：Qt 全局 a11y 开关验证
+## 附录 A：Qt 全局 a11y 开关验证（2026-10-18 VM 实测）
 
-（VM 实测后回填）
+条件所限的部分验证（VM 上唯一带 `QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1` 的 Qt6 应用是
+lxqt-policykit-agent，它正承担 polkit 认证框职能不能动；系统无其他 Qt GUI 应用，也无编译器现造）：
+
+- **注册层 ✅**：带 env 的 Qt6 应用确实出现在 AT-SPI2 总线（`a11y_list_apps` 持续可见
+  `lxqt-policykit-agent`；不带 env 的 Qt 应用实测不出现在 M3 记录中）；
+- **树内容 ⚠️ 未验证**：空闲态（无窗口）dump 该应用只得 1 个 application 节点、0 子节点——
+  Qt 与 GTK4 一样懒建树，没有 UI 就没有树；**有窗口的 Qt 应用树能否完整读/点击，本轮未能验证**
+  （唯一候选窗口属于 polkit 认证框，复核期间不可触发）；
+- **全局方案未做**：目前 env 是逐应用带的（polkit 代理在 niri 会话配置里）。全局补齐方案：
+  会话级统一注入（niri-session 环境或 systemd 用户环境 `environment.d`），让所有 Qt 应用默认
+  注册总线——一行配置，待有真实 Qt 应用用例时一并验证树质量。
+
+矩阵中 Qt 格的"⚠️"即上述含义：注册可达已实证，交互可达未证。

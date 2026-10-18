@@ -59,6 +59,7 @@ Atomic 镜像（bootc，需 podman）：`./scripts/build-image.sh --smoke`，
 - [权限分级 v1（三档/portal/polkit）](docs/permissions.md)
 - [会话录屏与回放](docs/session-recording.md)
 - [goose 接入说明](docs/goose-integration.md)
+- [能力矩阵（agent 能操作哪些应用）](docs/capabilities.md) · [桌面操作 skill（任何 agent 框架可移植）](skills/agentos-desktop/SKILL.md)
 - [真机安装与验证手册](docs/real-machine.md)
 - [桌面 shell（Noctalia 选版/补丁矩阵）](docs/noctalia.md) · [默认终端（Ghostty）](docs/ghostty.md) · [键位](docs/keyboard.md)
 

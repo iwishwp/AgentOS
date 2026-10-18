@@ -35,7 +35,8 @@ set -euo pipefail
 FEDORA_VERSION="${FEDORA_VERSION:-44}"
 BASE_IMAGE="quay.io/fedora/fedora-bootc:${FEDORA_VERSION}"
 # 拉取韧性设计（实测 VM→quay 曾出现传输停滞：连接活着但 10s 只收 ~200B）：
-#   * podman 自带 --retry 3 处理「快速失败」的 blob 错误；
+#   * 不用 podman pull --retry（CI runner 的 apt 版 podman 不认该参数，2026-10-18
+#     首跑实证）；外层循环本身就是重试机制；
 #   * 外层 timeout 兜住「停滞不报错」的挂起（停滞不会触发重试，只会挂死），
 #     超时即视为本次失败，进入下一次尝试——已完成的 blob 有本地缓存，续传很快；
 #   * 硬阻断（DNS/TLS 立即失败）两次即停，遵守「不设置来路不明代理」纪律。
@@ -84,7 +85,7 @@ else
     echo "== podman pull ${BASE_IMAGE}（最多 ${PULL_ATTEMPTS} 次，单次上限 ${PULL_TIMEOUT}s）=="
     pulled=0
     for i in $(seq 1 "$PULL_ATTEMPTS"); do
-        if timeout "$PULL_TIMEOUT" podman pull --retry 3 "$BASE_IMAGE"; then
+        if timeout "$PULL_TIMEOUT" podman pull "$BASE_IMAGE"; then
             pulled=1; break
         fi
         echo "pull 第 ${i} 次失败（错误或 ${PULL_TIMEOUT}s 停滞超时）$([[ $i -lt $PULL_ATTEMPTS ]] && echo '，15s 后重试（已完成 blob 有缓存）')"

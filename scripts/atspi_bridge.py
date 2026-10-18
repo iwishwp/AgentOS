@@ -164,9 +164,19 @@ def cmd_texts(app):
     out = []
     for node in dfs(app):
         try:
-            if node.getRoleName() in ("text", "edit"):
+            role = node.getRoleName()
+            if role in ("text", "edit", "entry"):
                 content = text_of(node)
                 if content is not None and content.strip() != "":
+                    out.append({"name": node.name, "text": content})
+            elif role in ("label", "static", "heading", "paragraph"):
+                # Qt 的 QLabel 不实现 AT-SPI Text 接口（queryText 抛异常），可见文本
+                # 只在 accessible name 里（实测 PyQt5 2026-10-18：点击后 label 的
+                # name 从"初始状态"变"你好，AgentOS"）；Chromium 的页面文本在
+                # static/heading/paragraph（Text 接口可用）；GTK 的 label 走 Text
+                # 接口。统一：Text 接口优先，失败回落 name，两者通吃
+                content = text_of(node) or node.name
+                if content and content.strip() != "":
                     out.append({"name": node.name, "text": content})
         except Exception:
             continue
@@ -176,7 +186,7 @@ def cmd_texts(app):
 def cmd_settext(app, match, new_text):
     for node in dfs(app):
         try:
-            if node.getRoleName() not in ("text", "edit"):
+            if node.getRoleName() not in ("text", "edit", "entry"):
                 continue
             if match != "*" and match not in (node.name or ""):
                 continue
@@ -186,6 +196,37 @@ def cmd_settext(app, match, new_text):
         except Exception:
             continue
     raise RuntimeError(f"未找到可编辑文本节点（匹配 {match!r}）")
+
+
+def prime_tree(app):
+    """Chromium/Electron 懒建树触发：AT 对已注册对象调 GetAttributes/GetRelationSet
+    后 Chromium 才开始构建页面内容树（Orca 走的同一条路；GTK/Qt 对此无副作用）。
+    树是异步构建的——触发后短暂轮询，直到出现 document web（页面根）或轮询耗尽
+    （实测 2026-10-18：触发前只有窗口装饰按钮，触发后 h1/button/input 全部出现）。"""
+    def has_page_root():
+        for node in dfs(app, max_depth=6):
+            try:
+                if node.getRoleName() == "document web":
+                    return True
+            except Exception:
+                continue
+        return False
+
+    for _ in range(4):
+        try:
+            if app.childCount == 0:
+                return
+        except Exception:
+            return
+        if has_page_root():
+            return
+        for node in dfs(app, max_depth=4):
+            try:
+                node.getAttributes()
+                node.getRelationSet()
+            except Exception:
+                continue
+        time.sleep(0.5)
 
 
 def main():
@@ -226,6 +267,9 @@ def main():
                 names.append(a.name)
         print(f"未找到应用 {sys.argv[2]}；当前注册: {names}", file=sys.stderr)
         return 1
+
+    # Chromium/Electron 在这里触发懒建树（GTK/Qt 直接返回，最多 ~0.5s）
+    prime_tree(app)
 
     # 名称寻址命令（推荐：跨进程稳定）
     if cmd == "click":

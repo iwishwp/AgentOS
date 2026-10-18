@@ -28,6 +28,9 @@ spawn-at-startup "env" "QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1" "/usr/libexec/lxqt-p
 // 版本论证见 docs/noctalia.md。waybar 配置保留在 os/configs/waybar/ 作为回退）
 spawn-at-startup "qs" "-c" "noctalia"
 
+// goose 悬浮球（常驻：干活进展 + 待确认提醒，安装见 scripts/install-orb.sh，设计 docs/orb.md）
+spawn-at-startup "qs" "-c" "agentos-orb"
+
 // 美学配置（布局/动画/色板），见 os/configs/theming/niri/aesthetics.kdl
 // include 语义为文档拼接：layout 与 animations 段只在那个文件里定义，勿在此重复
 include "./aesthetics.kdl"

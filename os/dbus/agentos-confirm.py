@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """org.agentos.Confirm1 —— AgentOS 用户级确认服务（权限模型 v1 的 T1 通道）。
 
-接口（docs/permissions.md §4.1，另加一个便捷方法 Wait）：
-  Request(s agent, s tool, s summary_redacted, s tier) → (u req_id)
+接口（docs/permissions.md §4.1，另加两个便捷方法）：
+  Request(s agent, s tool, s summary_redacted, s tier, u timeout_ms) → (u req_id)
   Respond(u req_id, s choice)          # 编程应答（测试/无障碍驱动/其它客户端）
   Wait(u req_id, i timeout_ms) → (s choice, s by, u elapsed_ms)   # 阻塞到出结果
+  ListPending() → (a(ussss))           # 只读：未决请求列表（悬浮球轮询用）
   信号 Confirmed(u req_id, s choice, s by)
 
 choice ∈ {allow_once, allow_session, deny_once, always_deny}
@@ -54,6 +55,11 @@ NODE_XML = """
       <arg type="s" direction="out" name="by"/>
       <arg type="u" direction="out" name="elapsed_ms"/>
     </method>
+    <!-- 只读：列出未决请求（悬浮球等状态展示用；已决的即便还在 5 分钟保留期也不算）。
+         返回 (req_id, agent, tool, summary, tier) 列表。 -->
+    <method name="ListPending">
+      <arg type="a(ussss)" direction="out" name="pending"/>
+    </method>
     <signal name="Confirmed">
       <arg type="u" name="req_id"/>
       <arg type="s" name="choice"/>
@@ -76,12 +82,14 @@ CHOICE_BANNERS = [
 
 
 class Request:
-    __slots__ = ("id", "agent", "tool", "started", "choices", "timer_id", "result")
+    __slots__ = ("id", "agent", "tool", "summary", "tier", "started", "choices", "timer_id", "result")
 
-    def __init__(self, rid, agent, tool):
+    def __init__(self, rid, agent, tool, summary="", tier=""):
         self.id = rid
         self.agent = agent
         self.tool = tool
+        self.summary = summary
+        self.tier = tier
         self.started = time.monotonic()
         self.choices = {}  # notif_id -> choice（点击哪条通知=哪个选择）
         self.timer_id = 0
@@ -133,6 +141,9 @@ class ConfirmService:
                 req_id, timeout_ms = params.unpack()
                 out = self.do_wait(req_id, timeout_ms)
                 invocation.return_value(GLib.Variant("(ssu)", out))
+            elif method == "ListPending":
+                out = self.do_list_pending()
+                invocation.return_value(GLib.Variant("(a(ussss))", (out,)))
             else:
                 invocation.return_dbus_error(
                     f"{BUS_NAME}.UnknownMethod", f"未知方法 {method}"
@@ -149,7 +160,7 @@ class ConfirmService:
         except (TypeError, ValueError):
             timeout_ms = 0
         timeout_ms = max(5_000, min(600_000, timeout_ms or TIMEOUT_MS))
-        req = Request(self.next_id, agent or "agent", tool or "tool")
+        req = Request(self.next_id, agent or "agent", tool or "tool", summary or "", tier or "")
         self.next_id += 1
         self.requests[req.id] = req
         tier_label = {"t1": "T1 确认", "t2": "T2 强确认"}.get(tier, tier)
@@ -239,6 +250,14 @@ class ConfirmService:
             except Exception:  # noqa: BLE001 —— 通知可能已不在
                 pass
         req.choices.clear()
+
+    def do_list_pending(self):
+        """未决请求快照（悬浮球轮询用）：result 未决的按 id 升序。"""
+        return [
+            (r.id, r.agent, r.tool, r.summary, r.tier)
+            for rid, r in sorted(self.requests.items())
+            if r.result is None
+        ]
 
     def do_wait(self, req_id, timeout_ms):
         """阻塞直到 req_id 有结果或超时。等待期间继续迭代主循环（不阻塞其他调用）。"""

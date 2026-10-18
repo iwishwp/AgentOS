@@ -220,3 +220,67 @@ COPR `errornointernet/quickshell` 有 fedora-44-aarch64 的 0.3.2 成功构建�
 新装应用（如 ghostty）聚焦后状态栏不显示图标/名称，但 app-id ↔ .desktop ↔ hicolor
 图标三件套齐全——是 Noctalia 启动时的应用图标缓存未含新装应用，**重启 Noctalia
 即恢复**（`pkill -f '[q]s -c noctalia'` 后会话 env 重启）。装/更新应用后记得重启 shell。
+
+## 11. "面板打不开"事故排查与 0006 加固（2026-10-18）
+
+### 11.1 事故与排查结论
+
+中午起用户报"设置/启动面板打不开"：`qs -c noctalia ipc call settings open` rc=0
+但面板不出现。逐项排查（qslog by-id 实例逐个对时间线、journal、niri layers、
+截图取证）后的结论：
+
+- **故障窗口只在 10:01 起的那个长驻实例上**（by-id `nlt1pxy2nt`，10:01:01 生 →
+  11:47:34 被杀）。11:47 重启后的三个实例上，用户自己的排障截图
+  （11:56 / 12:05 / 12:06 / 12:11，`/tmp/settings-ipc-test.png` 等）里**设置面板
+  每次都是打开的**——"重启不能复位"不成立，重启就是有效的；
+- 期间唯一一次真实失败有照片实锤：11:58 `agentos-launcher` 走到了 fuzzel 兜底
+  （说明那一次 `launcher toggle` IPC 返回非零）——单次抖动，此后 5 连测不复现；
+- 故障实例的 qslog 里 11:42:34 有控制中心内容实例化痕迹（ProfileCard 的
+  `~/.face` 加载序列），即"内容加载了、表面没出"——但该实例 stderr 被
+  `/dev/null` 吞掉（ssh 拉起时 `>/dev/null 2>&1`），Noctalia Logger 的 WARN/ERROR
+  只走 stderr，**app 级证据全部丢失**，无法定论单一根因；
+- 排除项：desktop 文件（移开+重启实测）、niri 改绑（配置里无 layer-rule）、
+  colors.json m 驼峰键（当前键下面板全功能正常）、quickshell 0.3 API 遗留
+  （全树 grep 无未修补的 `Corner:`/`CornerState` 用法）。
+
+### 11.2 0006 补丁：面板打开链路加固
+
+虽然根因不可考（证据被吞），但排查中确认了上游两个**能精确复现该症状类别**
+（rc=0、状态机显示已打开、面板永不出现、重启前不可恢复）的脆弱点，补成 0006
+（`os/configs/noctalia/patches/0006-panel-open-robustness-watchdog.patch`，
+对 0.2.1/0.3 两套补丁基线均干净应用）：
+
+1. **SmartPanel 看门狗提前**：上游 open 看门狗（强制 `isPanelVisible=true`）只在
+   `Loader.onLoaded` 回调**末尾**启动——内容组件加载出错（Loader Error）、
+   incubation 卡住、或回调链中（如 `setPosition()`）抛异常时，看门狗永远不会被
+   启动，面板卡在"已打开但不可见"（键盘独占+压暗），直到重启。现在 `open()`
+   一调用就武装看门狗；`onLoaded` 回调整体 try/catch，异常时记 Logger.e 并强制
+   可见（面板至少能被 Esc 关掉）；Loader 状态 Error 也上报告警。
+2. **CurrentScreenDetector 死锁恢复**：所有面板 open 的 IPC 都经过
+   `withCurrentScreen()`。多屏异步检测模式下若隐形检测窗口没回调，
+   `pendingCallback` 永远挂着，之后**所有**面板 open 请求被静默丢弃
+   （"Another detection is pending" 只是一条 WARN——写进被吞的 stderr）。
+   现在 800ms 超时后用 `findScreenWithBar()` 回落执行并告警。
+
+### 11.3 stderr 可观测性（防再次无据可查）
+
+Noctalia 的 Logger WARN/ERROR 只走 stderr；qslog（by-id 实例日志）只含
+quickshell 引擎级内容（import 扫描、desktop entry 扫描），**排查面板问题不能
+指望 qslog**。为此新增 `scripts/noctalia-restart.sh`：bracket 模式 pkill +
+会话 env 重启，且把 stderr 每行加时间戳后追加到
+`~/.cache/noctalia/shell-stderr.log`。VM 上请用它替代手工 pkill+setsid。
+
+### 11.4 验证记录（2026-10-18 12:44-12:57，agentos-vm，0006 已部署）
+
+| 验证项 | 结果 |
+|---|---|
+| 重启后首次 `settings open` | exclusive + 截图见完整面板 ✓ |
+| `settings toggle` ×5 | 每轮 open=exclusive / close=none ✓ |
+| `agentos-launcher` 脚本 ×5 | 全部开 Noctalia 启动面板，**零 fuzzel 兜底** ✓ |
+| launcher clipboard 模式（`launcher clipboard`） | exclusive → Esc → none ✓ |
+| bar 右键菜单 | 正常弹出 ✓ |
+| bar NotificationHistory（铃铛）点击 | 面板开 → Esc 关 ✓ |
+| bar ControlCenter widget 点击 | exclusive + 完整控制中心 → Esc → none ✓ |
+| 收尾 | `niri msg layers` 六个 noctalia 表面 interactivity 全 none，桌面干净 ✓ |
+
+Esc 用 ydotool 真键盘事件（`ydotoold` + `ydotool key 1:1 1:0`）验证，非 IPC 等价路径。

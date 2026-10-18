@@ -13,12 +13,13 @@ description: 操作 AgentOS 桌面（niri/Wayland）：窗口与工作区管理�
 
 1. **L0 系统层**——窗口/工作区/启动/文件/通知/剪贴板（niri/desktop/system/files 扩展）：最稳，优先用；
 2. **L1 无障碍树**——GUI 应用内按名称点击/读写文本（a11y 扩展，AT-SPI2）：无需焦点、不打扰用户，
-   GTK3/GTK4 实测全通；Qt 应用需启动环境带 `QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1`，
-   Chromium/Electron 需 `--force-renderer-accessibility`（未带开关则树不暴露）；
-   Java/X11 老应用当前不可达（❌，见 capabilities.md 补齐路径）；
+   GTK3/GTK4/Qt 实测全通（Qt 的全局开关与 Chromium 的 toolkit-accessibility 已是系统默认，
+   2026-10-18 起）；Chromium 树读/文本输入可达（**页面点击走 L2**）；Java 未装（路径见
+   capabilities.md 附录 B）；纯 X11 应用（xterm 类）无树，只能 L3；
 3. **L2 浏览器 CDP**——网页一切操作（browser 扩展，agent 专属无头 Chromium）；
-4. **L3 视觉/输入兜底**——grim 截图（可靠）、ydotool 键盘（可靠）、ydotool 指针（**不可靠**：
-   加速度下漂移，只用于键盘类注入）。
+4. **L3 视觉/输入兜底**——grim 截图（可靠）、键盘注入（`scripts/kb-inject.sh`：wtype 用户级
+   为主力，文本/组合键可靠；控制键（回车/Tab）回落 ydotool 需 sudo）、指针注入（**不可靠**：
+   加速度下漂移，只作最后手段）。
 
 遇到"打不开/打不好"的应用：先想是不是 L1 前置条件没满足（a11y 开关），再用 L3 截图看真实状态，
 不要盲目重试。
@@ -92,6 +93,9 @@ extensions:
 
 实测纪律：**按名称寻址，不要按树索引**（树结构跨 AT 连接会重建）；GTK4 的树要等 AT 客户端
 注册后才完整；同名多实例时桥解析到先注册者——先读文本对状态判别实例，必要时关掉多余实例。
+Chromium 例外注意：树懒构建（桥自动触发，首次 dump 多等 1-2 秒属正常）；**写文本框用
+"grabFocus + kb-inject type"组合**（Chromium 的 entry 不吃 setTextContents）；页面**按钮点击
+不生效**（doAction 派发但 onclick 不跑），页面操作一律走 browser 扩展。
 
 ### browser —— 网页操作（L2，agent 专属无头 Chromium）
 | 工具 | 用途 | 关键参数 |
@@ -163,8 +167,9 @@ extensions:
 | Chromium 钥匙串锁死网络服务 | 浏览器拉起即卡 | 启动带 `--password-store=basic`（browser 扩展已内建；自己起 chromium 记得带） |
 | soffice 单实例锁 | 已开 LibreOffice 时再 open 同类文档可能无窗/卡 | 先确认 soffice 进程状态；文档打开用 `app:"libreoffice"` 走启动器语义；上次异常退出还会弹 "Document Recovery" 窗口（2026-10-18 实测），列表确认窗口时别把它当成目标文档窗 |
 | LibreOffice MIME 关联不可靠 | Fedora 把 fodt 识别成 text/xml 用编辑器打开 | `open` 必须带 `app:"libreoffice"` |
-| Qt 应用不出现在 a11y 总线 | `a11y_list_apps` 看不到 | 启动环境加 `QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1`（全局方案未装，逐应用带） |
-| Chromium/Electron a11y 树为空 | dump 不出内容 | 启动加 `--force-renderer-accessibility`（浏览器操作本走 L2，一般用不到） |
+| Qt 应用不出现在 a11y 总线 | `a11y_list_apps` 看不到 | 系统已全局开（/etc/environment 的 `QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1`，重启持久）；仍看不到=应用启动早于环境落位或非 Qt 官方绑定，重启应用 |
+| Chromium/Electron a11y 树为空 | dump 不出内容 | ① 启动带 `--force-renderer-accessibility`（browser 扩展已默认带）；② `toolkit-accessibility` 必须在**应用启动前**为 true（已全局开；后改无效，须重启应用）；③ 树懒构建，dump 一次让桥触发（见 §2 a11y 纪律） |
+| 键盘注入选型 | 需要打字/快捷键 | `scripts/kb-inject.sh`：文本与组合键用 wtype（用户级）；**回车/Tab 等控制键 wtype 对 GTK 不生效**，走 ydotool（sudo）；中文可能丢首字符，输完从 a11y 树读回核对 |
 | 水族馆初始有 niri 热键浮层 | 截图被"Important Hotkeys"遮挡 | 注入 Esc 关闭；agent 沙箱里连不上 ydotoold socket（root 600），借 `niri__open_app` 在真实桌面环境执行注入 |
 | ydotool 指针漂移 | 绝对定位失准（libinput 加速度 ≈0.5） | 指针不可依赖；键盘注入可靠；socket 路径注意 `/tmp/.ydotool_socket` vs `$XDG_RUNTIME_DIR` 的版本差异 |
 | GTK4 树初始不完整 | dump 只有十几个节点 | 先 `a11y_list_apps`/dump 一次让 AT 客户端注册，再 dump 才完整（16→105 节点实测） |
@@ -173,7 +178,8 @@ extensions:
 
 ## 5. 升级路径（当目标应用打不开时按序尝试）
 
-L0（系统层，永远先试）→ L1（a11y：检查目标应用工具包的 a11y 开关是否带上）→
-L2（网页类必走）→ L3 兜底（grim 看 + ydotool 键盘；指针不可靠）。
-仍打不开的类型与补齐路径：Java 需 JAB、X11 老应用需 X11 AT-SPI 桥、合成器自身 UI 只能输入注入——
-详表见仓库 `docs/capabilities.md`。
+L0（系统层，永远先试）→ L1（a11y：GTK3/4/Qt 已默认可达；Chromium 检查 flag 与
+toolkit-accessibility 顺序；第三方 Electron 按 capabilities.md 附录 B 加 flag）→
+L2（网页类必走）→ L3 兜底（grim 看 + kb-inject 键盘；指针不可靠）。
+仍打不开的类型：纯 X11 应用（xterm 类，无树，L3 是终点）、Java（需 JAB，路径见
+capabilities.md 附录 B）、合成器自身 UI 只能输入注入——详表见仓库 `docs/capabilities.md`。

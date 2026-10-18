@@ -40,6 +40,11 @@
 - **键位速查页**（`92f8f8d`）：Super+K → canvas `/keys`（可滚动+分组吸顶+过滤框；
   键位实时解析 niri 配置、配色实时读 colors.json，双零副本）；`Mod+Shift+Slash`
   保留 niri 内置兜底。
+- **M5 镜像点亮用户亲验 ✅（2026-10-18）**：用户登录 agentos-bootc-test 成功——
+  SDDM → niri 会话可进、终端可运行。镜像骨架链闭合；观感层（Noctalia/主题/ghostty）
+  未进镜像为已知断层，用户决定暂不补齐（补齐方案已备，随 D1/D2 一起拍板）。
+  另：vmrun captureScreen 被拒是 macOS 权限弹窗无人处理所致——今后遇到宿主权限类
+  失败立即告知用户处理，不再静默绕行。
 - **键位速查浮层**（`c111027` 后续）：Super+K 弃用 chromium `--app`（"像启动了个 app"），
   改 layer-shell 覆盖层 `qs -c agentos-hotkeys`（`os/configs/hotkeys/shell.qml`）——
   Omarchy/niri 心智：居中面板+压暗背景+一行一条，Esc/点按关闭。数据/配色双零副本

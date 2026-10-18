@@ -54,8 +54,8 @@ class SettingsInterface extends dbus.interface.Interface {
     return true;
   }
 
-  /** 信号（configureMembers 包装为 emit：调用即广播） */
-  async Changed(variant: string): Promise<string> {
+  /** 信号（configureMembers 包装为 emit：调用即广播）——必须同步返回，dbus-next 同步编组 */
+  Changed(variant: string): string {
     return variant;
   }
 }

@@ -129,3 +129,19 @@ Noctalia 先覆写 colors.json，钩子按最新 darkMode 把**对应变体**重
 #414039 暖调，surface_container/surface/primary/on_surface 四键精确命中；浅档计算器
 container #f0efe8、primary #76725c（=键）精确命中、prefer-dark 自动翻 false；状态栏/
 mako/fuzzel/浮层两档均实测同族跟随。
+
+### 切换主题后各界面如何生效（2026-10-18 实测）
+
+| 界面 | 生效方式 | 时延 |
+|---|---|---|
+| 状态栏/面板（Noctalia） | watchChanges 热重载 colors.json | 即时 |
+| mako 通知 | theme-mako.sh 内置 makoctl reload | 即时 |
+| fuzzel 启动器 | 每次唤起读配置 | 下次打开 |
+| ghostty 终端 | **新开窗口生效**；已开窗口不跟随（1.3.1 实测 config-reload 不替换已开表面调色板） | 新窗口 |
+| GTK 应用 | 暗/亮跟随 gsettings 即时（libadwaita 内建）；**命名色覆盖（gtk.css）只对新进程生效**，已开应用不重读 | 暗/亮即时、调色板重启 |
+| canvas 三页 | 刷新页面（F5） | 手动 |
+| 键位浮层/悬浮球 | 按键时起进程读色板，重开即新配色 | 下次触发 |
+
+ghostty 浅色可读性（2026-10-18 修复）：16 色极性随变体翻转——浅色档 ANSI 前景全部
+向 on_surface（深字色）调和，container 系（原生是背景色）不再直接用作前景；
+背景用 surface_container（比纯 surface 深一档）避免过亮。

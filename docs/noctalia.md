@@ -214,3 +214,9 @@ COPR `errornointernet/quickshell` 有 fedora-44-aarch64 的 0.3.2 成功构建�
 已固定进 `apply-lanrhyme-theme.sh`；毛玻璃对栏/面板/dock 同样生效。
 
 音频频谱仍静止（0001 保留，0.3.2 依旧无 PwAudioSpectrum，等上游）。
+
+## 10. 图标缓存（2026-10-18 实测）
+
+新装应用（如 ghostty）聚焦后状态栏不显示图标/名称，但 app-id ↔ .desktop ↔ hicolor
+图标三件套齐全——是 Noctalia 启动时的应用图标缓存未含新装应用，**重启 Noctalia
+即恢复**（`pkill -f '[q]s -c noctalia'` 后会话 env 重启）。装/更新应用后记得重启 shell。

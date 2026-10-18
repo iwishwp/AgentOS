@@ -217,11 +217,18 @@ export function buildServer(
           .max(300)
           .describe("给用户看的问题/事项摘要（一行，脱敏）"),
         tier: z.enum(["t1", "t2"]).default("t1").describe("档位标注（影响通知文案）"),
+        timeout_ms: z
+          .number()
+          .int()
+          .min(5000)
+          .max(600000)
+          .default(30000)
+          .describe("等待用户点击的时长（毫秒，默认 30 秒；用户可能没盯着屏幕，重要事项给长一点）"),
       },
     },
-    async ({ summary, tier }) =>
+    async ({ summary, tier, timeout_ms }) =>
       guard(async () => {
-        const outcome = await confirmClient.ask("agent", "question", summary, tier);
+        const outcome = await confirmClient.ask("agent", "question", summary, tier, timeout_ms);
         audit({
           ts: new Date().toISOString(),
           extension: EXT,

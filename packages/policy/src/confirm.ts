@@ -104,7 +104,7 @@ export class ConfirmClient {
     this.gdbusBin = deps.gdbusBin ?? process.env["GDBUS_BIN"] ?? "gdbus";
   }
 
-  async ask(extension: string, tool: string, summary: string, tier: string): Promise<ConfirmOutcome> {
+  async ask(extension: string, tool: string, summary: string, tier: string, timeoutMs?: number): Promise<ConfirmOutcome> {
     const key = `${extension}.${tool}`;
     if (this.denied.has(key)) {
       return { choice: "deny_once", by: "always-deny-memory", responseMs: 0 };
@@ -128,7 +128,8 @@ export class ConfirmClient {
         ...args,
       ]);
 
-    const req = await call("Request", [extension, tool, summary.slice(0, 300), tier], 10);
+    const effectiveMs = Math.max(5_000, Math.min(600_000, timeoutMs ?? 30_000));
+    const req = await call("Request", [extension, tool, summary.slice(0, 300), tier, String(effectiveMs)], 10);
     if (req.code !== 0) {
       return {
         choice: "deny_once",
@@ -147,7 +148,8 @@ export class ConfirmClient {
       };
     }
 
-    const wait = await call("Wait", [String(reqId), String(this.askTimeoutMs)], Math.ceil(this.askTimeoutMs / 1000) + 10);
+    const waitMs = Math.max(this.askTimeoutMs, effectiveMs + 5_000);
+    const wait = await call("Wait", [String(reqId), String(waitMs)], Math.ceil(waitMs / 1000) + 10);
     const responseMs = this.now() - started;
     if (wait.code !== 0) {
       return { choice: "deny_once", by: "client-timeout", responseMs };

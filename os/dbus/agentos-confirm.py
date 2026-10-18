@@ -13,7 +13,7 @@ choice ∈ {allow_once, allow_session, deny_once, always_deny}
 
 通知载体（Fedora mako 1.11 实测：不渲染动作按钮，见 CHOICE_BANNERS 处注释）：
 每个选择各发一条带默认动作的横幅，点击哪条即哪个选择，自上而下读作
-允许/会话允许/拒绝/永不。30 秒无应答 = deny_once（超时后主动 CloseNotification）。
+允许/会话允许/拒绝/永不。默认 30 秒无应答 = deny_once（调用方可传 timeout_ms 调整，5s..600s）。
 服务不可运行时的安全语义由调用方兜底：确认通道不存在 ⇒ 拒绝执行。
 """
 import sys
@@ -121,8 +121,8 @@ class ConfirmService:
     def handle_call(self, conn, sender, path, iface, method, params, invocation):
         try:
             if method == "Request":
-                agent, tool, summary, tier = params.unpack()
-                rid = self.do_request(sender, agent, tool, summary, tier)
+                agent, tool, summary, tier, timeout_ms = params.unpack()
+                rid = self.do_request(sender, agent, tool, summary, tier, timeout_ms)
                 invocation.return_value(GLib.Variant("(u)", (rid,)))
             elif method == "Respond":
                 req_id, choice = params.unpack()
@@ -140,7 +140,14 @@ class ConfirmService:
             invocation.return_dbus_error(f"{BUS_NAME}.Internal", f"{type(e).__name__}: {e}")
 
     # ---------- 核心流程 ----------
-    def do_request(self, sender, agent, tool, summary, tier):
+    def do_request(self, sender, agent, tool, summary, tier, timeout_ms=0):
+        # 每请求超时可配（默认 30s，钳 5s..600s）：桌面用户未必盯着屏幕，
+        # 固定 30s 太紧（2026-10-18 真实点击复核两次超时的教训）
+        try:
+            timeout_ms = int(timeout_ms)
+        except (TypeError, ValueError):
+            timeout_ms = 0
+        timeout_ms = max(5_000, min(600_000, timeout_ms or TIMEOUT_MS))
         req = Request(self.next_id, agent or "agent", tool or "tool")
         self.next_id += 1
         self.requests[req.id] = req
@@ -150,7 +157,7 @@ class ConfirmService:
             if summary and summary != "(参数摘要不可用)":
                 body += f"\n{summary}"
             if choice == "allow_once":
-                body += f"\n（{tier_label} · 30 秒无响应视为拒绝）"
+                body += f"\n（{tier_label} · {timeout_ms // 1000} 秒无响应视为拒绝）"
             try:
                 notif_id = self.notify.Notify(
                     "(susssasa{sv}i)",
@@ -162,12 +169,12 @@ class ConfirmService:
                     ["default", title],   # 默认动作：点这条通知 = 这个选择
                     # critical：mako 对 critical 不自动过期，超时后由我们统一收走
                     {"urgency": GLib.Variant("y", 2)},
-                    TIMEOUT_MS,
+                    timeout_ms,
                 )
                 req.choices[notif_id] = choice
             except Exception as e:  # noqa: BLE001 —— 通知系统缺失时记录，仍走超时拒绝路径
                 print(f"WARN: Notify 失败: {e}", file=sys.stderr)
-        req.timer_id = GLib.timeout_add(TIMEOUT_MS + 500, self.on_timeout, req)
+        req.timer_id = GLib.timeout_add(timeout_ms + 500, self.on_timeout, req)
         print(f"agentos-confirm: Request #{req.id} {agent}.{tool} tier={tier}", file=sys.stderr)
         return req.id
 

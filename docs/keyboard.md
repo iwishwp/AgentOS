@@ -71,18 +71,22 @@ niri 配置里的 `Super`（及 `Mod`，在 TTY 会话中 Mod 即 Super）物理
 
 ### 2.1 键位速查（Super+K：系统浮层 + agent 网页版）
 
-`Super+K` 弹出 **layer-shell 浮层**（`qs -c agentos-hotkeys`，Omarchy Keybindings
-形态：近全屏半透明面板（四边距屏 12px）、轻压暗背景、Esc/点按即关，进程即起即退
-无常驻）：
+`Super+K` 弹出 **layer-shell 悬浮卡片**（`qs -c agentos-hotkeys`，Omarchy Keybindings
+形态：**顶部居中的悬浮卡片，非全屏**——宽约半屏（≤680px）、高≤屏高 68%、状态栏下
+留 27px 间距、四周见壁纸；圆角 12 / 描边 2px 的卡片档位与 mako/启动器同族；轻压暗
+背景、Esc/点按即关，进程即起即退无常驻。曾试近全屏面板（四边距屏 12px），被否——
+参考形态应以"悬浮卡片"为准）：
 
 - **不是应用窗口**——第一版用过 chromium `--app` 开 canvas 页，被否（重、像启动了
   个 app）；现改 layer-shell 覆盖层，`os/configs/hotkeys/shell.qml`（quickshell
   独立小配置，安装 `scripts/install-hotkeys.sh`）；
-- **行式仿 Omarchy**（按参考截图像素实测对齐）：纯文本键列（大写等宽，组合键渲染为
-  `SUPER SHIFT + F`：修饰键空格分隔、末键前加 `+`，只改渲染不动解析）、无键帽芯片；
-  说明列所有行从同一 x 起始（内容宽 52%），`→` 与键同强调色；标题左上角小号常规
-  字重灰字、下方大留白；分组标题弱化（小号低透明度）；
-- **一行一条 + 超高滚动**（滚轮/PageUp/PageDown/方向键）；
+- **行式仿 Omarchy**（按参考截图像素实测对齐）：纯文本键列（大写等宽 DemiBold，中性
+  白 on_surface，组合键渲染为 `SUPER SHIFT + F`：修饰键空格分隔、末键前加 `+`，只改
+  渲染不动解析）、无键帽芯片；说明列所有行从同一 x 起始（内容宽 46%），`→` 与说明
+ 同强调色 primary（Omarchy 的"键列中性、箭头+说明点色"结构）；标题小号常规字重灰
+  字；分组标题弱化（小号低透明度）；底部细分隔线 + 淡提示（↑↓ 滚动 · ESC 关闭）；
+- **一行一条 + 卡片内滚动**（滚轮/PageUp/PageDown/方向键；翻页键挂在有焦点的
+  全屏 Item 上统一操作 contentY——ListView 自身无焦点，挂在它身上不生效，实测踩过）；
 - **数据零副本**：启动时解析 `~/.config/niri/config.kdl` 的 binds 段（62 条全量，
   含内联参数与滚轮键；`AGENTOS_NIRI_CONFIG` 可覆盖）；
 - **配色零副本**：读 `~/.config/noctalia/colors.json`（莫兰迪），缺省降级内置同值

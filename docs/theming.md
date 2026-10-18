@@ -62,3 +62,38 @@ sudo dnf install google-noto-sans-cjk-fonts google-noto-sans-mono-cjk-fonts
 
 美化属于 M5（发行打磨）的前置工作，不阻塞 M4（信任与安全）主线；
 P1（Noctalia 实装）建议排在 M4 收尾后、与 M5 的默认配置打磨合并进行。
+
+## 7. 视觉语言规范（雏形，2026-10-18 第一批实测归纳）
+
+> 第一批统一对象：mako 通知（已达标）→ fuzzel 启动器 → Super+K 键位浮层。
+> 以下档位全部经 VM 实拍像素级验证（色值实测与 colors.json 生成值一致）；
+> 后续 orb 悬浮球、canvas 页面按此收口。
+
+### 7.1 档位表
+
+| 档位 | 值 | 来源依据 | 已应用 |
+|---|---|---|---|
+| 卡片圆角 | **12px**（内嵌元素如 fuzzel 选中行 8px） | mako border-radius=12（首批验收基线） | mako ✅ / fuzzel ✅ / 键位浮层 ✅ |
+| 卡片描边 | **2px**，色 = `outline_variant`（#6c6a61） | mako border-size=2 | 同上 |
+| 卡片底色 | `surface_container`（#37362f），**不透明度 93±1%**（透一点壁纸） | 键位浮层 0.93 / fuzzel 0.94 实拍同感 | 同上 |
+| 选中/高亮底 | `surface_container_highest`（#3d3b34） | fuzzel 选中行 | fuzzel ✅ |
+| 强调色 | `primary`（#dad8ce 暖米白）：匹配高亮、箭头+说明列、critical 描边 | Omarchy 行式结构（键列中性、说明点色） | fuzzel ✅ / 键位浮层 ✅ / mako(critical) ✅ |
+| 正文/键列 | `on_surface`（#f3f3f2），键列用等宽 + DemiBold | Omarchy bold mono 键名 | 键位浮层 ✅ |
+| 次级文字 | `on_surface_variant`（#b5b4b0），低透明度 0.7–0.8 用于标题/提示 | 弱化层级 | 全部 ✅ |
+| 字体 | 正文 Noto Sans CJK SC；键名/代码 等宽 | 系统字体（bar 同源） | 全部 ✅ |
+| 悬浮形态 | **顶部居中**（状态栏 37px 下留 16–27px 间距），宽度克制（启动器 ~40% 屏宽 / 键位卡片 ≤50% 且 ≤680px），四周见壁纸 | Omarchy 参考（用户裁定：非全屏） | fuzzel ✅ / 键位浮层 ✅ |
+| 背景压暗 | 模态浮层下 15% 黑 | Omarchy 模态语感 | 键位浮层 ✅ |
+
+### 7.2 色相一致性实测（同族判据）
+
+卡片族在 HSV 空间收敛：底色 H=50–60°、S≤15%、V≈22%；描边 H≈49°；文字/强调
+H=40–60°、S≤7%。三张卡片（mako / fuzzel / 浮层）实测底色 #37362f / #373631 /
+#353530——同色相同明度族（差异来自各自透明度叠不同壁纸区域，属预期）。
+状态栏底为近不透明深底（叠深色壁纸后 #0b0b23，冷调来自壁纸透出），卡片暖调
+为 morandi 色板正色——卡片族内部一致即"同族"，不向状态栏的壁纸透出色对齐。
+
+### 7.3 组件接入清单（后续收口）
+
+- orb 悬浮球：底/描边/圆角按上表；未做。
+- canvas 页面（/keys 等）：CSS 变量从 colors.json 生成；未做。
+- mako：已达标本表（作为档位基线来源）。

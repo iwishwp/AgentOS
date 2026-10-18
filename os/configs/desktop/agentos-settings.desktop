@@ -7,6 +7,6 @@ Comment[zh_CN]=AgentOS 设置（Noctalia 面板，经 IPC 打开）
 # gnome-control-center 在非 GNOME 会话直接拒启（实测 "only supported under GNOME"），
 # AgentOS 的设置入口指向真正可用的 Noctalia 设置面板
 Exec=qs -c noctalia ipc call settings open
-Icon=preferences-system
+Icon=org.gnome.Settings
 Terminal=false
 Categories=Settings;System;

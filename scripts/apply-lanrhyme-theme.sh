@@ -10,7 +10,8 @@
 #   1. settings.json：bar.position=top（用户偏好顶部横栏）、scaleRatio=0.9、
 #      托盘折叠、density/capsuleOpacity/Workspace 样式（与 LanRhyme 对齐；
 #      时钟横排格式 formatHorizontal 默认已带）
-#   2. colors.json：写入 LanRhyme 莫兰迪色板（源色 #eee6ba，由 kita.png 生成）
+#   2. 色板：部署暗/浅双变体规范源（lanrhyme-palette{,-light}.json）并写 colors.json
+#      （暗=源色 #eee6ba 由 kita.png 生成；浅=gen-palette-variant.py 规则推导）
 #      ——关键：必须同时把 colorSchemes.useWallpaperColors 置 true，
 #      否则启动时 ColorSchemeService 会套预设主题并【覆写】colors.json
 #      （v4.7.1 里 colors.json 是生成缓存/输出，不是自由输入）
@@ -75,15 +76,16 @@ json.dump(d, open(p, "w"), indent=2, ensure_ascii=False)
 print("settings.json: position=top density=comfortable useWallpaperColors=true")
 PY
 
-cp "${LAN_DIR}/colors.json" "${NOCTALIA_DIR}/lanrhyme-palette.json"   # 规范源（蛇形 Material 键）
+cp "${LAN_DIR}/colors.json" "${NOCTALIA_DIR}/lanrhyme-palette.json"        # 规范源·暗（蛇形 Material 键）
+cp "${LAN_DIR}/colors-light.json" "${NOCTALIA_DIR}/lanrhyme-palette-light.json"  # 规范源·浅（gen-palette-variant.py 推导）
 cp "${LAN_DIR}/colors.json" "${NOCTALIA_DIR}/colors.json"
-# 状态栏真正吃上色板：Noctalia v4.7.1 只认 m 驼峰键，需转换（theme-noctalia.sh）；
-# 终端同源莫兰迪（theme-ghostty.sh）
+# 全界面分发：状态栏(m驼峰转换)+通知+启动器+终端+GTK，统一走调度器
+# （读 settings.json darkMode 选变体；缺浅色板自动回落暗）
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-bash "${SCRIPT_DIR}/theme-noctalia.sh" || true
-bash "${SCRIPT_DIR}/theme-ghostty.sh" || true
+bash "${SCRIPT_DIR}/theme-apply-all.sh" || true
 # 防覆写钩子（2026-10-18 实测：Noctalia 暗亮切换/换壁纸会覆写 colors.json——浅色默认
-# 值直接顶掉我们的色板）：三个 hook 全部挂回 theme-noctalia.sh 重新落盘
+# 值直接顶掉我们的色板）：三个 hook 全部挂 theme-apply-all.sh，按当前 darkMode
+# 重落**对应变体**到全部界面（noctalia/mako/fuzzel/ghostty/gtk）
 python3 - <<'PYHOOK'
 import json, os
 p = os.path.expanduser("~/.config/noctalia/settings.json")
@@ -91,9 +93,9 @@ d = json.load(open(p))
 d.setdefault("hooks", {})
 d["hooks"]["enabled"] = True
 for h in ("darkModeChange", "wallpaperChange", "colorGeneration"):
-    d["hooks"][h] = "bash /home/demon/AgentOS/scripts/theme-noctalia.sh"
+    d["hooks"][h] = "bash /home/demon/AgentOS/scripts/theme-apply-all.sh"
 json.dump(d, open(p, "w"), indent=2, ensure_ascii=False)
-print("hooks: darkModeChange/wallpaperChange/colorGeneration -> theme-noctalia.sh")
+print("hooks: darkModeChange/wallpaperChange/colorGeneration -> theme-apply-all.sh")
 PYHOOK
 echo "colors.json: $(python3 -c "import json,os;print(json.load(open(os.path.expanduser('~/.config/noctalia/colors.json')))['source_color'])")"
 

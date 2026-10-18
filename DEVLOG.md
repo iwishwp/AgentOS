@@ -142,6 +142,9 @@ worktree `feat/goose-e2e-skill`（测试 229 基线不动，全绿）。三件�
    demon/123456）——用键盘在 SDDM 登录一次进 niri 会话（这是自动化覆盖不到的
    最后一步），看完可自行关机；产物在 `~/codespace/agentos-images/`。
 
+- **goose 悬浮球**（`55e2faa`）：`qs -c agentos-orb` 常驻右缘——idle/working（审计驱动，
+  显示当前工具）/attention（Confirm1 待确认）三态 + 点击面板（最近活动/待确认/直达
+  /replay 与 /artifacts）；Confirm1 增只读 ListPending。VM 三态+面板全链实测。
 ### 设计债（用户观察 2026-10-18）
 
 1. **启动器重复**：状态栏火箭图标（Noctalia Launcher，点击开 Noctalia 启动面板）与

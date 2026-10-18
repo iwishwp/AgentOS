@@ -56,7 +56,7 @@ describe("ensure 与启动", () => {
         if (url.includes("/json/version")) {
           if (!up) {
             up = true; // 第一次探测失败，第二次（启动后）成功
-            throw new Error("down");
+            return Promise.reject(new Error("down"));
           }
           return { Browser: "x" };
         }
@@ -67,6 +67,35 @@ describe("ensure 与启动", () => {
     expect(launchedArgs).toHaveLength(1);
     expect(launchedArgs[0]).toContainEqual("--remote-debugging-port=9222");
     expect(launchedEnv[0]?.["WAYLAND_DISPLAY"]).toBe("wayland-2");
+  });
+
+  it("默认带 --force-renderer-accessibility（L1 树可达）；AGENTOS_BROWSER_NO_A11Y=1 关闭", async () => {
+    let up = false;
+    const httpJson = async (url: string) => {
+      if (url.includes("/json/version")) {
+        if (!up) {
+          up = true;
+          return Promise.reject(new Error("down"));
+        }
+        return { Browser: "x" };
+      }
+      return [{ type: "page", webSocketDebuggerUrl: "ws://x" }];
+    };
+    const withFlag = makeClient({ httpJson });
+    await withFlag.client.ensure();
+    expect(withFlag.launchedArgs[0]).toContainEqual("--force-renderer-accessibility");
+
+    up = false;
+    const prev = process.env["AGENTOS_BROWSER_NO_A11Y"];
+    process.env["AGENTOS_BROWSER_NO_A11Y"] = "1";
+    try {
+      const withoutFlag = makeClient({ httpJson });
+      await withoutFlag.client.ensure();
+      expect(withoutFlag.launchedArgs[0]).not.toContainEqual("--force-renderer-accessibility");
+    } finally {
+      if (prev === undefined) delete process.env["AGENTOS_BROWSER_NO_A11Y"];
+      else process.env["AGENTOS_BROWSER_NO_A11Y"] = prev;
+    }
   });
 
   it("没有水族馆时启动被拒", async () => {

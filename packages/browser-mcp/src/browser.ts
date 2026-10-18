@@ -231,14 +231,20 @@ export class BrowserClient {
     }
     fs.mkdirSync(this.userDataDir, { recursive: true });
     const headed = process.env["AGENTOS_BROWSER_HEADED"] === "1";
+    const noA11y = process.env["AGENTOS_BROWSER_NO_A11Y"] === "1";
     this.launch(
       [
         `--remote-debugging-port=${this.port}`,
         `--user-data-dir=${this.userDataDir}`,
-        // 关键：headless/服务化环境必须跳过钥匙环——Chromium 经 libsecret 解密 Cookie，
+        // 关键：headless/服务化环境必须跳过钥匙串——Chromium 经 libsecret 解密 Cookie，
         // 钥匙环锁定时网络服务会阻塞等待解锁对话框，表现为一切 http/https 导航挂死
         // （data: URL 正常的假象即来源于此，实测 2026-10-16）
         "--password-store=basic",
+        // 默认强制开启渲染器无障碍：Chromium 平时只在检测到屏幕阅读器时才构建 a11y 树，
+        // 此 flag 让页面元素树始终暴露到 AT-SPI2 总线，a11y 扩展（L1）得以按名读取/
+        // 点击浏览器内页面（实测 2026-10-18，headless new 模式同样生效）；性能开销可忽略
+        // （树按需序列化）。设 AGENTOS_BROWSER_NO_A11Y=1 可关闭。
+        ...(noA11y ? [] : ["--force-renderer-accessibility"]),
         // 默认无头：agent 的视觉由 CDP 截图承担；有头模式在嵌套 Wayland 环境不稳定
         // （ozone 自动选择 + 渲染进程交换问题，实测），需要围观时设 AGENTOS_BROWSER_HEADED=1
         ...(headed ? [] : ["--headless=new"]),

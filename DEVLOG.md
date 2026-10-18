@@ -6,6 +6,41 @@
 
 ---
 
+## 2026-10-18（深夜追加三：a11y 覆盖长尾——Qt/Chromium/X11 定论 + 注入升级）
+
+worktree `feat/a11y-coverage`。目标：把能力矩阵 L1 的 ⚠️/❌ 清干净——每格 VM 实测定论。
+
+- **Qt ⚠️→✅**：`QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1` 落 `/etc/environment`（PAM 载体，
+  SSH/GDM 会话通吃），重启持久全链验证（niri 进程 environ → spawn-sh 的 PyQt5 探针窗自动
+  注册 → settext/click/texts 读回"你好，重启后"）。载体 `dnf install python3-qt5`（29 包，
+  未拉 KDE）。意外发现：本机 at-spi2 新版下 **PyQt5 不带 env 也默认注册**（Qt5 检测路径变化），
+  env 保留作显式保证。修复桥：**QLabel 不实现 AT-SPI Text 接口**（文本在 accessible name），
+  `texts` 对 label/static/heading/paragraph 走 "Text 接口优先、name 回落"。
+- **Chromium ⚠️→✅（读/输入）**：根因三层——① `--force-renderer-accessibility`（**browser-mcp
+  已默认带**，`AGENTOS_BROWSER_NO_A11Y=1` 可关，单测覆盖）；② `toolkit-accessibility=true`
+  必须**先于应用启动**（GNOME 默认 false 时 Chromium 永不注册、事后开无效须重启应用；已
+  `gsettings set` 全局持久）；③ 树懒构建需 AT 调 `GetAttributes` 触发（Orca 同路）——桥内建
+  `prime_tree()` 自动触发+轮询。实测页面树完整（document web→heading/button/entry/段落）、
+  按名读文本 ✅、entry 走 grabFocus+wtype 输入读回 ✅；**按钮 doAction 派发 true 但 onclick
+  不执行**（两会话复现，如实定论：页面点击归 L2 CDP）。Electron 文档化同 flag（VS Code 另
+  需 editor.accessibilitySupport）。
+- **X11 ❌→分层定论**：xwayland-satellite 0.8.2 在位在跑（:0）。xterm 能跑但无树（xorg-x11-apps
+  已被 Fedora 41+ 移除，xterm 为替代载体）；**GTK3 强制 X11 后端全通**（atk-bridge 走 DBus
+  与显示后端无关，settext/click/texts "你好，深潜"读回）；**GTK4 X11 后端不注册**（gtk4 a11y
+  桥绑 Wayland）。
+- **Java ❌（路径文档化）**：完整 JDK + `-Dswing.defaultlaf=...GTKLookAndFeel` + 内置 atk-bridge
+  （JDK 11+ 随 JDK），详见 capabilities.md 附录 B。
+- **注入升级**：新增 `scripts/kb-inject.sh`（type/type-slow/key）——wtype 优先（用户级无需
+  sudo），ydotool 回落（sudo+正确 socket）。实测边界全入注释：文本/组合键（ctrl+shift+comma
+  →ghostty 热重载）可靠；**纯控制键（Return/Tab）wtype 对 GTK 不触发**（space 却能进字）、
+  CJK 丢首字符（"潜航员甲"→"航员甲"）——控制键走 ydotool，关键输入树读回核对。
+- **矩阵收口**：capabilities.md 五行更新（Qt ✅、Chromium ✅读/输入、Electron ⚠️文档化、
+  X11 分层、L3 拆 wtype/ydotool 两行）+ 附录 A 补全 + 新附录 B 四节；SKILL.md §0/§2/§4/§5
+  同步。npm test **230 全绿**（229 基线 + browser-mcp flag 新测试）。
+- 运维教训两条：`pkill -f` bracket 技巧只在模式串与命令行其他内容隔离时有效——同一 ssh
+  命令里出现真名（spawn/nohup 行）即自杀（本轮两次踩中，拆调用解决）；VM 的 /tmp 在重启后
+  清空，测试脚本要重建。
+
 ## 2026-10-18（深夜追加二：系统主题联动三件套——调度器/GTK 桥/双变体）
 
 worktree `feat/theme-sync`。目标：换壁纸或切暗亮时，状态栏/通知/启动器/终端/全部

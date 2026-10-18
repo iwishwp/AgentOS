@@ -1,0 +1,13 @@
+[Unit]
+Description=AgentOS goose 悬浮球（qs -c agentos-orb，工作进展/待确认常显）
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/qs -c agentos-orb
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical-session.target

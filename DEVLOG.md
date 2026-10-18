@@ -210,7 +210,12 @@ worktree `feat/goose-e2e-skill`（测试 229 基线不动，全绿）。三件�
 
 ---
 
-## 2026-10-18（晚）
+## 2026-10-18（深夜）
+
+- **悬浮球服务化**：`os/systemd/agentos-orb.service`（Restart=on-failure）——手动拉起的
+  进程悄悄死过一次，systemd 接管后自愈；ghostty 热重载定论：palette 属 surface 级，
+  两条重载路径已开窗口均不换色（如实修正 theming 表述）。
+
 - **两处收尾**：设置条目更名"系统设置"（去括号说明）；Noctalia 暗亮切换会**覆写
   colors.json**（实测切浅色后 72 键莫兰迪被 437 字节浅色默认顶掉）——挂
   darkModeChange/wallpaperChange/colorGeneration 三钩子自动重落色板，darkMode 回暗档

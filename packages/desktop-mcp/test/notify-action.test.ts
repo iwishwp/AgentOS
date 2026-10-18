@@ -79,7 +79,7 @@ function makeClient(spawn: ShimSpawn) {
   return { desktop, detached };
 }
 
-const PARAMS = { summary: "周报完成", urgency: "low" as const, waitMs: 600_000 };
+const PARAMS = { summary: "周报完成", urgency: "low" as const, timeoutMs: 8000, waitMs: 600_000 };
 
 describe("notifyAction 投递与点击事件", () => {
   it("送达成功 → action 通道；后续 invoked=true 触发回调", async () => {
@@ -92,10 +92,14 @@ describe("notifyAction 投递与点击事件", () => {
     const delivered = await desktop.notifyAction({ ...PARAMS, actionLabel: "查看产物" }, (o) => results.push(o));
     expect(delivered).toEqual({ delivered: "action", notifId: 42 });
     expect(results).toEqual([{ invoked: true }]);
-    // shim 收到完整参数（python3 -c 内嵌脚本 + stdin JSON）
+    // shim 收到完整参数（python3 -c 内嵌脚本 + stdin JSON，键名必须 snake_case——
+    // VM 实测曾因 camelCase 键让 shim 崩在 watchdog 注册）
     expect(shim.seen[0]!.cmd).toBe("python3");
     expect(shim.seen[0]!.args[0]).toBe("-c");
     expect(shim.seen[0]!.input).toMatchObject({ summary: "周报完成", urgency: "low" });
+    expect(Object.keys(shim.seen[0]!.input as object)).toEqual(
+      expect.arrayContaining(["wait_ms", "timeout_ms", "action_label"]),
+    );
   });
 
   it("用户没点（dismissed/expired）→ onResult invoked=false", async () => {

@@ -160,7 +160,10 @@ try:
         "(susssasa{sv}i)",
         "AgentOS", 0, "dialog-information",
         params["summary"], params.get("body") or "",
-        ["default", params.get("action_label") or "打开"],
+        # default：点击通知本体触发（mako 无按钮）；open：具名动作，给自动化通道——
+        # VM 实测 makoctl invoke 是静默空转，编程触发要走 fr.emersion.Mako.InvokeAction
+        ["default", params.get("action_label") or "打开",
+         "open", params.get("action_label") or "打开"],
         {"urgency": GLib.Variant("y", URGENCY.get(params["urgency"], 1))},
         params.get("timeout_ms", -1))
 except Exception as e:

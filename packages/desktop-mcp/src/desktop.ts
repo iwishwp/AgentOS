@@ -171,7 +171,16 @@ export class DesktopClient {
         this.bins.python3 ?? "python3",
         ["-c", NOTIFY_SHIM_PY],
         {
-          input: JSON.stringify(params),
+          // shim 是 python（snake_case）：这里做一次键名转换，VM 实测曾因 camelCase
+          // 键 KeyError 崩在 watchdog 注册（notify-action 的教训）
+          input: JSON.stringify({
+            summary: params.summary,
+            body: params.body,
+            urgency: params.urgency,
+            timeout_ms: params.timeoutMs,
+            wait_ms: params.waitMs,
+            action_label: params.actionLabel,
+          }),
           env: dbusEnv(),
           onLine: (e) => {
             if (firstEvent) {

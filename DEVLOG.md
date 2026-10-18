@@ -6,6 +6,40 @@
 
 ---
 
+## 2026-10-18（下午追加：goose 端到端 + 能力矩阵 + 通用 skill）
+
+worktree `feat/goose-e2e-skill`（测试 229 基线不动，全绿）。三件事：
+
+- **真 goose 无头会话端到端 ✅**（`goose run -t` + GLM glm-5.3-flash，全程审计留证，
+  VM 证据目录 `~/e2e/`）：
+  - **任务 1 系统操作链两跑**：首跑无代答——读操作全通，open_app/move/close 弹 T1 横幅
+    30s 无人应答→超时 deny，桌面零变动（安全语义的天然实证）；重跑用
+    `org.agentos.Confirm1.Respond` 编程应答（permissions.md §4.1 明示的测试通道）作
+    用户代答：7 步全通——开 ghostty→移工作区 2（轮询时间线 ws_id 5→6 独立核验，
+    模型还自行用 list_workspaces 核对 idx↔id 映射）→关闭→notify 汇报；
+  - **任务 2 GUI 计算链**：水族馆开 gnome-calculator→dump 树→按名点 C/4/2/×/1/0/=→
+    读文本得 **420**。四个诚实发现：①同名实例寻址歧义（桌面+水族馆两个 calculator，
+    桥解析到先注册者，模型靠读状态自行判别后关旧实例）；②水族馆初始热键浮层遮挡截图，
+    模型自主定位其不在 a11y 总线、借 `open_app` 在真实桌面 env 注入 Esc 关闭（agent
+    沙箱连不上 root 600 的 ydotoold socket）；③T2 装包无头必 300s 超时（polkit 须人在），
+    且残留认证框会抢水族馆键盘；④goose 内建 shell/developer 扩展不经 AgentOS 策略网关
+    （策略面只覆盖 MCP 扩展——后续可考虑收紧 goose 配置）；
+  - **任务 3 文档链**：files 读 inbox 三文件→写 `reports/weekly-report.fodt`（合计 118
+    算对）→`open` 带 `app:"libreoffice"`→list_windows 实证 soffice 窗口→notify low+
+    open_path 动作。视觉复核 Writer 渲染正常；顺带实证 "Document Recovery" 窗口现象。
+  - **代答纪律**（与主会话用户复核撞车后确立）：代答器必须白名单——只放行
+    niri.open_app/desktop.open 这类操作型确认；`desktop.confirm` 是 agent→用户提问通道，
+    绝不代答。审计天然区分证据：by=respond（编程）/by=notify-action（真人，用户复核
+    10:35:31 已成功留证）/by=timeout（无人）。
+- **docs/capabilities.md ✅**：按 L0-L3 四层回答"agent 能否操作任何打开的应用"——
+  结论"分层可预期而非任何"：L0/L2 全 ✅；L1 GTK3/4 ✅、Qt ⚠️（env 开关注册可达已实证、
+  有窗树未验证——附录 A）、Chromium/Electron ⚠️（需 flag）、Java/X11/合成器 UI ❌；
+  L3 grim/键盘 ✅、指针 ⚠️。含"哪类打不开"清单与补齐优先级。
+- **skills/agentos-desktop/SKILL.md ✅**：自包含可移植版（YAML frontmatter + 挂载
+  （goose/mcpServers 双格式）+ 45 工具速查表 + 行为约定 + 11 条实测坑 + L0→L3 升级
+  路径），任何能挂 stdio MCP 的框架可用；README 文档区已挂链接；goose-system.md 注明
+  "skill=对外可移植版 / goose-system=goose 专属版"关系（未删改）。
+
 ## 2026-10-18
 
 - **M2 呈现层 ✅ 关账**（worktree `feat/m2-finish`，测试 194 → **229 全绿**）：最后两项

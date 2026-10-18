@@ -255,14 +255,14 @@ worktree `feat/goose-e2e-skill`（测试 229 基线不动，全绿）。三件�
 
 ### 用户侧（等你在场 / 你操作）
 
-1. **吊销 GLM 临时 API key**（`367f40b9…` 开头那个，多次提醒过）；
+1. **吊销 GLM 临时 API key**（见本地记录，勿入公开仓库——已从本文件抹除前缀）；
 2. **T1 复核**：真人鼠标点一次确认横幅（虚拟指针等价路径已验证，产品语义需真人过一遍）；
 3. **T2 复核**：真人输一次 polkit 密码（ydotool 键盘等价已验证）；
 4. **Ghostty**：物理键盘 Super+Return 实按开终端（当时为避免与 M4 ydotool 测试冲突跳过）；
 5. **worktree 清理确认**：`../AgentOS-theming`（你的美化分支，已合并）、
    `../AgentOS-pi-research`（研究分支）——确认不用即可删；
 6. **M5 点亮亲验**：`agentos-bootc-test` VM 正在 Fusion 运行（192.168.54.131，
-   demon/123456）——用键盘在 SDDM 登录一次进 niri 会话（这是自动化覆盖不到的
+   测试机账号密码见本地备忘）——用键盘在 SDDM 登录一次进 niri 会话（这是自动化覆盖不到的
    最后一步），看完可自行关机；产物在 `~/codespace/agentos-images/`。
 
 - **goose 悬浮球**（`55e2faa`）：`qs -c agentos-orb` 常驻右缘——idle/working（审计驱动，

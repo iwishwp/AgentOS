@@ -476,7 +476,7 @@ sudo podman run --rm --privileged --security-opt label=type:unconfined_t \
   user 单元三件套 enabled / canvas HTTP 200 / goose 1.55.0（Mac 中转供给）；
 - 截图：vmrun captureScreen 需 open-vm-tools 登录（镜像未装），不可用——
   **VM 以 GUI 模式运行中，Fusion 窗口即实物证据**；「图形登录进 niri 会话」
-  需用户键盘输入一次（demon/123456），留待亲验。
+  需用户键盘输入一次（测试机凭据见本地备忘），留待亲验。
 
 ### vmrun 备忘（本机实测）
 

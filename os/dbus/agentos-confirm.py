@@ -39,6 +39,7 @@ NODE_XML = """
       <arg type="s" direction="in" name="tool"/>
       <arg type="s" direction="in" name="summary"/>
       <arg type="s" direction="in" name="tier"/>
+      <arg type="u" direction="in" name="timeout_ms"/>
       <arg type="u" direction="out" name="req_id"/>
     </method>
     <method name="Respond">

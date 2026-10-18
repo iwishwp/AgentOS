@@ -97,3 +97,19 @@ H=40–60°、S≤7%。三张卡片（mako / fuzzel / 浮层）实测底色 #373
 - orb 悬浮球：底/描边/圆角按上表；未做。
 - canvas 页面（/keys 等）：CSS 变量从 colors.json 生成；未做。
 - mako：已达标本表（作为档位基线来源）。
+
+### 主题同步原则（2026-10-18 用户提出）
+
+一切**第一方可主题界面**读同一份规范色板：`~/.config/noctalia/lanrhyme-palette.json`
+（Material 蛇形键，源为 os/configs/noctalia/lanrhyme/colors.json）。换壁纸重生成色板
+后全系统跟随。当前消费方与桥接脚本：
+
+| 界面 | 桥接 | 状态 |
+|---|---|---|
+| 状态栏 Noctalia | theme-noctalia.sh（m 驼峰转换，v4.7.1 键名陷阱见 docs/noctalia.md） | ✅ |
+| mako 通知 | theme-mako.sh | ✅ |
+| fuzzel 启动器 | theme-fuzzel.sh | ✅ |
+| 键位浮层 / 悬浮球 | QML 直读（兜底内置同值） | ✅ |
+| ghostty 终端 | theme-ghostty.sh（16 色） | ✅ |
+| canvas 三页 | CSS 变量直读 colors.json | ✅ |
+| 第三方应用（浏览器页面等） | 尽力而为，不作承诺 | — |

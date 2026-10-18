@@ -143,6 +143,18 @@ worktree `feat/goose-e2e-skill`（测试 229 基线不动，全绿）。三件�
 
 ---
 
+## 2026-10-18（晚）
+
+- **状态栏莫兰迪"假阳性"更正与真修复**：像素采样实锤——状态栏此前一直是 Noctalia
+  内置海军蓝（#090922 系），10-17 的"莫兰迪已生效"是把默认黄 #fff59b 误判的假阳性
+  （用户直觉"不是一个主题"是对的）。根因：v4.7.1 只认 m 驼峰键（官方模板
+  Assets/Templates/noctalia.json），LanRhyme 蛇形键对不上→静默回落默认。
+  `scripts/theme-noctalia.sh` 生成双键格式合并文件；复测栏主色 #21201c ✓。
+- **ghostty 终端莫兰迪化**：`scripts/theme-ghostty.sh`（16 色+背景/前景/光标/选区，
+  从规范色板生成，注释保留原 Catppuccin 可回切）。
+- **系统主题同步原则**（用户提出，写入 theming.md §7）：一切第一方可主题界面读同一
+  份 Material 蛇形色板（colors.json），换壁纸全系统跟随；第三方应用尽力而为。
+
 ## 2026-10-18（下午）
 
 - **通知样式对齐系统主题**：`scripts/theme-mako.sh`——从 Noctalia 色板（colors.json，

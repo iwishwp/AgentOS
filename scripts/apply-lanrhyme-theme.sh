@@ -75,7 +75,13 @@ json.dump(d, open(p, "w"), indent=2, ensure_ascii=False)
 print("settings.json: position=top density=comfortable useWallpaperColors=true")
 PY
 
+cp "${LAN_DIR}/colors.json" "${NOCTALIA_DIR}/lanrhyme-palette.json"   # 规范源（蛇形 Material 键）
 cp "${LAN_DIR}/colors.json" "${NOCTALIA_DIR}/colors.json"
+# 状态栏真正吃上色板：Noctalia v4.7.1 只认 m 驼峰键，需转换（theme-noctalia.sh）；
+# 终端同源莫兰迪（theme-ghostty.sh）
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+bash "${SCRIPT_DIR}/theme-noctalia.sh" || true
+bash "${SCRIPT_DIR}/theme-ghostty.sh" || true
 echo "colors.json: $(python3 -c "import json,os;print(json.load(open(os.path.expanduser('~/.config/noctalia/colors.json')))['source_color'])")"
 
 # ---- 3) 壁纸 ----

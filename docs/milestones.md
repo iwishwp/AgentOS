@@ -150,7 +150,8 @@ app=libreoffice，窗口验证 soffice 26.2）→ 通知"。意外收获：给�
 （审计 grep 零命中；认证框密码由 ydotool 键盘直输 GUI，不经过 agent）；**回滚与回放**——
 "agent 误装包 → /replay 时间轴定位 → 快照回滚（sl 实证消失）→ 撤销落定"全程命令与输出留证。
 遗留待用户在场复核两项：真实鼠标点选横幅、真人输 polkit 密码（无人值守已分别由 makoctl invoke
-与 ydotool 键盘驱动覆盖信号等价路径）。
+与 ydotool 键盘驱动覆盖信号等价路径。2026-10-18 修正：实测本机 makoctl invoke 为静默空转，
+编程触发应直接调 mako 私有接口 fr.emersion.Mako.InvokeAction——见 real-machine.md 当日条目）。
 
 ## M5 发行（进行中 · 已完成 X，2026-10-17 晚）
 

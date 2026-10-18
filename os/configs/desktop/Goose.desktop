@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Goose
+Name[zh_CN]=Goose
+Comment=AgentOS 首要对话入口（经启动脚本：X11 后端+a11y+密钥库参数）
+# RPM 原条目零参数 → Electron 原生 Wayland 在 niri 永不映射窗口（docs/goose-desktop.md 坑二）
+# 用户目录同名覆盖系统条目；Exec 走四合一启动器（部署路径见 scripts/launch-goose-desktop.sh）
+Exec=/home/demon/AgentOS/scripts/launch-goose-desktop.sh %U
+Icon=/usr/share/pixmaps/Goose.png
+Terminal=false
+Categories=Utility;

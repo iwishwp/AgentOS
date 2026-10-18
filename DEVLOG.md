@@ -6,6 +6,29 @@
 
 ---
 
+## 2026-10-18（深夜追加：Noctalia"面板打不开"事故排查 + 0006 加固）
+
+worktree `fix/noctalia-panel`。用户午报"设置/启动面板打不开，重启不复位"。
+
+- **排查结论（证据链完整，见 docs/noctalia.md §11）**：故障窗口锁定在 10:01 起的
+  长驻实例（by-id `nlt1pxy2nt`，11:47:34 被杀）。**11:47 重启后用户自己的四张排障
+  截图（11:56/12:05/12:06/12:11）里设置面板全都开着**——"重启不能复位"不成立；
+  唯一有实锤的失败是 11:58 launcher 一次走了 fuzzel 兜底（单次 IPC 非 rc0 抖动，
+  后续 5 连测不复现）。故障实例 stderr 被 `/dev/null` 吞（Noctalia Logger WARN/ERROR
+  只走 stderr），app 级证据全灭，单一根因不可考。排除项：desktop 文件、niri 改绑
+  （无 layer-rule）、colors.json m 驼峰键、quickshell 0.3 API 遗留（全树 grep 干净）。
+- **0006 补丁**（上游两个可精确复现该症状类别的脆弱点，双基线通用）：
+  ① SmartPanel open 看门狗从 `onLoaded` 末尾提前到 `open()` + onLoaded 链 try/catch
+  强制可见 + Loader Error 告警——修"面板卡已打开不可见（键盘独占+压暗）直到重启"；
+  ② CurrentScreenDetector 800ms 超时恢复——修"多屏检测挂起后所有面板 open IPC 被
+  静默丢弃"。已部署 agentos-vm。
+- **可观测性**：新增 `scripts/noctalia-restart.sh`（bracket pkill + stderr 带时间戳
+  追加到 `~/.cache/noctalia/shell-stderr.log`）——qslog 只有引擎级日志，下次面板
+  问题有 stderr 可查。
+- **全套验证过**（layers 独占随开合翻转 + 截图）：settings open/首次、settings
+  toggle×5、agentos-launcher×5（零 fuzzel 兜底）、launcher clipboard 模式、bar 右键
+  菜单、铃铛/ControlCenter widget 点击、ydotool 真键盘 Esc 关闭、收尾桌面干净。
+
 ## 2026-10-18（晚追加：视觉语言统一第一批——fuzzel + Super+K 浮层）
 
 worktree `feat/visual-unify`。两交付，全部 VM 实拍像素级验证：

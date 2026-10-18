@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+# 覆盖系统同名条目（~/.local 优先于 /usr/share）：隐藏在 niri 会话必死的 GNOME 设置
+Name=Settings
+NoDisplay=true

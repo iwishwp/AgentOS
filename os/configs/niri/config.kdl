@@ -52,10 +52,11 @@ binds {
 
     // 启动器（fuzzel）：Omarchy 的 Super+Space（Omarchy menu）键位原样采纳，
     // 菜单实现换成我们实际用的 fuzzel
-    Super+Space { spawn "fuzzel"; }
+    Super+Space { spawn "agentos-launcher"; }
 
     // 启动器别名：niri 默认 Mod+D 保留
-    Mod+D hotkey-overlay-title="App Launcher: fuzzel" { spawn "fuzzel"; }
+    // 启动器统一入口：Noctalia 启动面板（与状态栏同款），回退 fuzzel（scripts/agentos-launcher.sh）
+    Mod+D hotkey-overlay-title="App Launcher" { spawn "agentos-launcher"; }
 
     // 浏览器（firefox）：Omarchy 的 Super+Shift+Return 原样采纳
     //（Omarchy 按发行版默认浏览器启动，我们固定为 firefox）

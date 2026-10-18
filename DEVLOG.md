@@ -144,6 +144,12 @@ worktree `feat/goose-e2e-skill`（测试 229 基线不动，全绿）。三件�
 ---
 
 ## 2026-10-18（晚）
+- **启动器统一与设置入口修复**：Super+D/Space → `agentos-launcher`（Noctalia 启动面板
+  IPC，fuzzel 兜底——换状态栏只改脚本一处，键位与习惯不变）；"设置"打不开的根因=
+  gnome-control-center 拒绝非 GNOME 会话（实测原话 "only supported under GNOME and
+  Unity"）——隐藏死条目 + 新 agentos-settings.desktop 经 IPC 开 Noctalia 设置面板
+  （该面板实测可开，截图存证）。
+
 
 - **状态栏莫兰迪"假阳性"更正与真修复**：像素采样实锤——状态栏此前一直是 Noctalia
   内置海军蓝（#090922 系），10-17 的"莫兰迪已生效"是把默认黄 #fff59b 误判的假阳性

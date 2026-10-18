@@ -142,6 +142,18 @@ worktree `feat/goose-e2e-skill`（测试 229 基线不动，全绿）。三件�
    demon/123456）——用键盘在 SDDM 登录一次进 niri 会话（这是自动化覆盖不到的
    最后一步），看完可自行关机；产物在 `~/codespace/agentos-images/`。
 
+### 设计债（用户观察 2026-10-18）
+
+1. **启动器重复**：状态栏火箭图标（Noctalia Launcher，点击开 Noctalia 启动面板）与
+   Super+D / Super+Space（fuzzel）是两套并存的启动器。建议：agent 优先+键盘文化下
+   fuzzel 为主，去掉栏上火箭组件（或反过来全押 Noctalia 启动器并让 Super+D 调它——
+   但其无 CLI 入口，需查 Noctalia IPC）。待用户拍板。
+2. **状态栏与系统主题的"同源异形"**：色源一致（bar/键位浮层/mako 通知/orb 都读同一
+   colors.json 莫兰迪色板），但**形态语言**不同——Noctalia 自带设计系统（胶囊 capsule、
+   tabler 图标集、0.93 透明度），我们的浮层/通知是另一种语法（无胶囊、描边卡片）。
+   建议：立一份"系统视觉语言"规范（胶囊半径/描边宽度/透明度/图标集/圆角档位），
+   把 keys 浮层、mako、orb、canvas 三页对齐到同一语法。待排期。
+
 ### 项目侧（下次开发）
 
 - **M5 发行（收尾会话已推进大头，剩尾款）**：x86_64 CI 实跑（workflow 已写好，

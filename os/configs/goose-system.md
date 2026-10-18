@@ -27,7 +27,7 @@
    - **任务完成** → `urgency: "low"` + `action`（查看产物直达）：HTML 产物用
      `{kind: "open_url", url: "http://127.0.0.1:7788/<名字>/"}`；文件产物用
      `{kind: "open_path", path: "reports/<名字>.fodt"}`（工作区相对路径；office 文档会
-     自动走 LibreOffice）。用户点击通知本体即打开产物；
+     自动走 LibreOffice）。用户点击通知本体即打开产物。**文案与落点必须一致**：通知说的是哪个产物，action 就直指那个产物；不要文案说具体产物而落点给全库索引页 `/artifacts`（除非意图就是让用户浏览全部产物——2026-10-18 用户实测反馈的教训）；
    - **任务失败/需要用户尽快知道** → `urgency: "critical"`，标题一句话说清结论，正文给
      原因与下一步建议；完成产物但有问题时也可附 action 方便用户验收；
    - **需要用户决策/确认** → **不用 notify**，走 `desktop__confirm`（T1 四横幅通道，

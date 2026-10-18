@@ -100,16 +100,32 @@ H=40–60°、S≤7%。三张卡片（mako / fuzzel / 浮层）实测底色 #373
 
 ### 主题同步原则（2026-10-18 用户提出）
 
-一切**第一方可主题界面**读同一份规范色板：`~/.config/noctalia/lanrhyme-palette.json`
-（Material 蛇形键，源为 os/configs/noctalia/lanrhyme/colors.json）。换壁纸重生成色板
-后全系统跟随。当前消费方与桥接脚本：
+一切**第一方可主题界面**读同一份规范色板，**暗/浅双变体**（Material 蛇形键）：
+
+- 暗色规范源：`~/.config/noctalia/lanrhyme-palette.json`（仓 `os/configs/noctalia/lanrhyme/colors.json`）
+- 浅色规范源：`~/.config/noctalia/lanrhyme-palette-light.json`（仓 `colors-light.json`，由
+  `scripts/gen-palette-variant.py` 从暗色板规则推导：surface 系→暖白米灰 #f5f4f0 系、
+  on_*→深暖文字、主色深一档保对比度、container→浅 tint、饱和度全程压住；输出同构 72 键）
+
+**统一调度器 `scripts/theme-apply-all.sh`**：读 settings.json 的 `colorSchemes.darkMode`
+选变体（`--dark/--light` 可强制），`export AGENTOS_COLORS_JSON=<变体>` 后依次跑全部桥，
+末尾打印结果一览；缺浅色板回落暗档。Noctalia 三个钩子
+（darkModeChange/wallpaperChange/colorGeneration）全部挂调度器——切档/换壁纸时
+Noctalia 先覆写 colors.json，钩子按最新 darkMode 把**对应变体**重落到全部界面。
+换壁纸重生成色板后全系统跟随。当前消费方与桥接脚本：
 
 | 界面 | 桥接 | 状态 |
 |---|---|---|
-| 状态栏 Noctalia | theme-noctalia.sh（m 驼峰转换，v4.7.1 键名陷阱见 docs/noctalia.md） | ✅ |
-| mako 通知 | theme-mako.sh | ✅ |
-| fuzzel 启动器 | theme-fuzzel.sh | ✅ |
-| 键位浮层 / 悬浮球 | QML 直读（兜底内置同值） | ✅ |
-| ghostty 终端 | theme-ghostty.sh（16 色） | ✅ |
+| 状态栏 Noctalia | theme-noctalia.sh（m 驼峰转换，v4.7.1 键名陷阱见 docs/noctalia.md） | ✅ 双变体 |
+| mako 通知 | theme-mako.sh（makoctl reload 即时生效） | ✅ 双变体 |
+| fuzzel 启动器 | theme-fuzzel.sh | ✅ 双变体 |
+| 键位浮层 / 悬浮球 | QML 直读（兜底内置同值；浮层 spawn 时读色，运行中不热重载） | ✅ 跟随 |
+| ghostty 终端 | theme-ghostty.sh（16 色；新窗口生效） | ✅ 双变体 |
+| **GTK3/4 全应用** | **theme-gtk.sh**（@define-color 覆盖 libadwaita 命名色 35 项 + GTK3 旧色名 22 项；与 settings.ini 共存，仅单行翻转 gtk-application-prefer-dark-theme；新窗口生效） | ✅ 双变体 |
 | canvas 三页 | CSS 变量直读 colors.json | ✅ |
-| 第三方应用（浏览器页面等） | 尽力而为，不作承诺 | — |
+| Qt/Kvantum、编辑器类（VSCode 等） | 未做（Qt 侧可后续走 Kvantum 生成，编辑器主题另议） | ⬜ |
+
+2026-10-18 晚实测（VM 像素采样）：暗档计算器对照组（无 css）#3e3e41 冷调 vs 套色后
+#414039 暖调，surface_container/surface/primary/on_surface 四键精确命中；浅档计算器
+container #f0efe8、primary #76725c（=键）精确命中、prefer-dark 自动翻 false；状态栏/
+mako/fuzzel/浮层两档均实测同族跟随。

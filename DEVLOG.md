@@ -6,6 +6,50 @@
 
 ---
 
+## 2026-10-18（深夜追加二：系统主题联动三件套——调度器/GTK 桥/双变体）
+
+worktree `feat/theme-sync`。目标：换壁纸或切暗亮时，状态栏/通知/启动器/终端/全部
+GTK 应用/自研 UI 一起跟随莫兰迪色板。
+
+- **浅色变体生成器 `scripts/gen-palette-variant.py`**：规则驱动从暗色规范板推导
+  （surface 系→暖白米灰 #f5f4f0 系、on_*→深暖文字、主色深一档保对比度 #76725c、
+  container→浅 tint、饱和度全程压住），输出同构 72 键入仓 `colors-light.json`。
+  非硬编码——换壁纸重生成暗色板后可重跑跟随。
+- **GTK 桥 `scripts/theme-gtk.sh`**：覆盖面最大的桥。gtk-4.0/gtk.css 用
+  `@define-color` 覆盖 libadwaita 命名色 35 项（accent/window/view/headerbar/
+  popover/card/dialog/sidebar/borders/语义色），gtk-3.0/gtk.css 用旧色名 theme_*
+  单独映射 22 项；BEGIN/END 标记块幂等。与 settings.ini 共存（光标/图标/字体行
+  不动），仅按变体**单行翻转** gtk-application-prefer-dark-theme——浅色板配
+  libadwaita 暗色样式会出斑，必须联动。变体由 surface 明度自动识别。
+  坑：`pkill -x` 有 15 字符上限（gnome-calculator 关不掉），`pkill -f` bracket
+  技巧在**同脚本里既有 spawn 字面量又有 pkill** 时会误杀自 shell（255）——
+  spawn 与 pkill 分开调用。
+- **统一调度器 `scripts/theme-apply-all.sh`**：读 settings.json
+  colorSchemes.darkMode 选变体（--dark/--light 强制），export
+  AGENTOS_COLORS_JSON 后依次跑五桥，末尾结果一览；单桥失败不中断；缺浅板回落
+  暗档。apply-lanrhyme-theme.sh 部署双变体并改跑调度器；Noctalia 三钩子
+  （darkModeChange/wallpaperChange/colorGeneration）全部改指调度器——切档时
+  Noctalia 先覆写 colors.json，钩子按最新 darkMode 重落对应变体。
+- **VM 实测全过（像素采样）**：
+  - 暗档：状态栏 #dad8ce（胶囊主色精确）；计算器对照组无 css #3e3e41 冷调
+    （R−B=−3）vs 套色 #414039 暖调（R−B=+8），且 surface_container #37362f
+    （标题栏）×3576、surface #21201c ×1078、primary #dad8ce（=键）×386、
+    on_surface #f3f3f2 ×35 精确命中；fuzzel 底 #35342e（#37362f@94%）+ 选中行
+    #3d3b34 精确；ghostty 新窗 #33342e 暖族（0.85 透明+模糊下的 #21201c）；
+    mako critical 底 #3d3b34 精确 + #dad8ce 描边 ×453。
+  - 切浅（`qs -c noctalia ipc call darkMode toggle` +4s）：colors.json 已是浅变体
+    （surface #f5f4f0、mPrimary #76725c、88 键蛇形+m 驼峰双保留）；计算器
+    container #f0efe8 ×3171 + surface #f5f4f0 ×933 + primary #76725c ×386 +
+    on_surface #282822 精确命中，两套 settings.ini prefer-dark 自动翻 false；
+    状态栏 #76725c 精确；mako #f0efe8 精确；Super+K 浮层 #e9e8e1 暖浅族。
+  - 切回暗：colors.json 回 #21201c；浮层重开后 #3d3c36 暖深族 ✓（浮层 spawn 时
+    读 colors.json，运行中不热重载，重开即跟随——预期行为）。
+- **遗留**：Qt/Kvantum 未做；编辑器类（VSCode 等）主题未接；浮层/ orb 热重载
+  （需 FileWatcher，低优）。
+
+
+---
+
 ## 2026-10-18（深夜追加：Noctalia"面板打不开"事故排查 + 0006 加固）
 
 worktree `fix/noctalia-panel`。用户午报"设置/启动面板打不开，重启不复位"。

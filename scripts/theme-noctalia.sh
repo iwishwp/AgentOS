@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
+# 【已收编】编排职责已移交 packages/settings-daemon（TS 常驻进程，watcher 自动触发）；
+# 本脚本保留作遗留兼容/单桥排查入口，逻辑与 TS 桥字节级对拍一致（见其 test/bridges.test.ts）。
 # scripts/theme-noctalia.sh —— 状态栏（Noctalia v4.7.1）真正吃上系统莫兰迪色板
 #
 # 历史坑（2026-10-18 像素采样实锤）：Noctalia v4.7.1 的 Color.qml JsonAdapter 只认

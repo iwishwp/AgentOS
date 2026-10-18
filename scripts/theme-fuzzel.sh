@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
+# 【已收编】编排职责已移交 packages/settings-daemon（TS 常驻进程，watcher 自动触发）；
+# 本脚本保留作遗留兼容/单桥排查入口，逻辑与 TS 桥字节级对拍一致（见其 test/bridges.test.ts）。
 # scripts/theme-fuzzel.sh —— 启动器 fuzzel 主题对齐系统莫兰迪
 #
 # 与 theme-mako.sh 同一模式：从 Noctalia 色板（colors.json，换壁纸重生成后自动

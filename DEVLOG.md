@@ -41,6 +41,40 @@ worktree `feat/goose-desktop`。目标：goose 图形版开机自启，成为与
 
 ---
 
+## 2026-10-18（深夜追加五：settings-daemon——主题编排收编常驻进程）
+
+worktree `feat/settings-daemon`。缝合桌面的"钩子链编排"（Noctalia 三钩子 → theme-apply-all.sh
+→ 五个 shell 桥，色板 heredoc 重复四份）收编为 TS 常驻进程 `packages/settings-daemon`
+（bin `agentos-settings`，ADR-0002）。为什么 TS：复用 monorepo 栈与 @agentos/proc 基建一轮落地；
+用户长期方向全项目 Rust，已记档，届时接口不变换语言。
+
+- **架构**：watcher（colors.json=Noctalia 覆写事件源 / settings.json darkMode / 两色板）→
+  applyTheme 编排器（theme-apply-all 语义照搬）→ 五桥共享 palette 模块（双键映射/blend 银行家
+  舍入/变体检测/8 位色）；状态快照 ~/.config/agentos/settings-state.json（v1 真相仍来自 noctalia
+  现有文件，不另立）；D-Bus org.agentos.Settings（dbus-next configureMembers 非装饰器注册；
+  属性 darkMode/paletteVariant + Apply(s)/Reload() + 信号 Changed）+ unix socket JSON 降级通道。
+- **环保护（最大坑）**：自己写 colors.json 会再触发 watch。三道闸：writeIfChanged 幂等写（内容
+  一致不写）→ 250ms 防抖 + sha256 内容哈希（已见/自写哈希皆不上行）→ 目录级监听防 rename 丢事件。
+  VM 全时段日志审计：事件上行仅 2 次（两次真实外部事件），自写回声全部"去重跳过"，零循环。
+- **职责迁移**：Noctalia 三钩子清空（enabled 保留）；theme-apply-all.sh 改薄壳转发 CLI；旧五桥
+  保留加"已收编"头注。systemd 用户单元 agentos-settings.service（graphical-session +
+  Restart=on-failure）；ghostty 热重载在无会话 env 的 systemd 环境下从 niri socket 名推导
+  WAYLAND_DISPLAY（niri.wayland-1.1437.sock → wayland-1，实测注入成功）。
+- **测试 40 个**（全仓 `npm test` 绿）：五桥与旧 shell 桥**字节级对拍**（暗/浅双档，抓出并修正
+  python round 银行家舍入 vs Math.round 的 1 色差）；环保护四态 + 端到端拓扑；编排/状态映射。
+- **VM 像素验证（192.168.54.130，双档）**：同会话同壁纸 A/B——daemon vs 旧桥原版脚本：
+  浅档 ghostty/bar/通知 **逐像素一致**（#f3f5ec/#d8d8d5/#f0efe8）；暗档 bar #22211d、通知
+  #37362f（=键精确命中）、计算器暗橄榄+米白=键、ghostty 同一开窗热重载翻暗（#32332d）——
+  与旧链基线一致。`qs -c noctalia ipc call darkMode toggle` → settings 事件→全桥应用 ~40ms；
+  Noctalia 覆写 colors.json → 重落；启动收敛全"同"（幂等零写）。D-Bus busctl 全通（introspect
+  与规格一致、Changed 信号 light/dark 实收）。附带发现：daemon 追加的 gsettings color-scheme
+  同向翻转在 VM 实测生效（'default'/'prefer-dark'）。
+- **遗留**：canvas 设置页接入（读 state 或 D-Bus）、更多状态源（壁纸/键位）、Rust 迁移时序。
+  VM 桌面还原：暗档、仅 goose、daemon active。（注：VM 上有一个不属本次工作的暗色浮层
+  ——AgentOS-m4 的 agentos-confirm 服务横幅，采样期间常驻屏幕中央，未动。）
+
+---
+
 ## 2026-10-18（深夜追加三：a11y 覆盖长尾——Qt/Chromium/X11 定论 + 注入升级）
 
 worktree `feat/a11y-coverage`。目标：把能力矩阵 L1 的 ⚠️/❌ 清干净——每格 VM 实测定论。

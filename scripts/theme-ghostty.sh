@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
+# 【已收编】编排职责已移交 packages/settings-daemon（TS 常驻进程，watcher 自动触发）；
+# 本脚本保留作遗留兼容/单桥排查入口，逻辑与 TS 桥字节级对拍一致（见其 test/bridges.test.ts）。
 # scripts/theme-ghostty.sh —— 终端（Ghostty）莫兰迪配色，与系统色板同源
 #
 # 原则（docs/theming.md §7）：一切第一方可主题界面读同一份 Material 蛇形色板

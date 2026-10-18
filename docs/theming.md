@@ -107,21 +107,22 @@ H=40–60°、S≤7%。三张卡片（mako / fuzzel / 浮层）实测底色 #373
   `scripts/gen-palette-variant.py` 从暗色板规则推导：surface 系→暖白米灰 #f5f4f0 系、
   on_*→深暖文字、主色深一档保对比度、container→浅 tint、饱和度全程压住；输出同构 72 键）
 
-**统一调度器 `scripts/theme-apply-all.sh`**：读 settings.json 的 `colorSchemes.darkMode`
-选变体（`--dark/--light` 可强制），`export AGENTOS_COLORS_JSON=<变体>` 后依次跑全部桥，
-末尾打印结果一览；缺浅色板回落暗档。Noctalia 三个钩子
-（darkModeChange/wallpaperChange/colorGeneration）全部挂调度器——切档/换壁纸时
-Noctalia 先覆写 colors.json，钩子按最新 darkMode 把**对应变体**重落到全部界面。
-换壁纸重生成色板后全系统跟随。当前消费方与桥接脚本：
+**编排宿主 = settings-daemon**（`packages/settings-daemon`，TS 常驻进程，见
+[docs/settings-daemon.md](settings-daemon.md) 与 ADR-0002）：watcher 监听 colors.json
+（Noctalia 暗/亮切换覆写它=事件源）、settings.json darkMode、两个色板文件，事件触发即按
+`colorSchemes.darkMode` 选变体跑全部桥（缺浅色板回落暗档）。Noctalia 三个钩子已清空
+（hooks 三键置空、enabled 保留）——职责移交 watcher。手动入口 `agentos-settings apply
+[--dark|--light|--auto]`；`scripts/theme-apply-all.sh` 保留为薄壳转发。
+换壁纸重生成色板后全系统跟随。当前消费方与桥（桥宿主=daemon，旧 shell 桥遗留兼容）：
 
-| 界面 | 桥接 | 状态 |
+| 界面 | 桥（daemon bridges/） | 状态 |
 |---|---|---|
-| 状态栏 Noctalia | theme-noctalia.sh（m 驼峰转换，v4.7.1 键名陷阱见 docs/noctalia.md） | ✅ 双变体 |
-| mako 通知 | theme-mako.sh（makoctl reload 即时生效） | ✅ 双变体 |
-| fuzzel 启动器 | theme-fuzzel.sh | ✅ 双变体 |
+| 状态栏 Noctalia | noctalia（m 驼峰转换，v4.7.1 键名陷阱见 docs/noctalia.md；双键合并 colors.json） | ✅ 双变体 |
+| mako 通知 | mako（makoctl reload 即时生效） | ✅ 双变体 |
+| fuzzel 启动器 | fuzzel（8 位 #RRGGBBAA） | ✅ 双变体 |
 | 键位浮层 / 悬浮球 | QML 直读（兜底内置同值；浮层 spawn 时读色，运行中不热重载） | ✅ 跟随 |
-| ghostty 终端 | theme-ghostty.sh（16 色；新窗口生效） | ✅ 双变体 |
-| **GTK3/4 全应用** | **theme-gtk.sh**（@define-color 覆盖 libadwaita 命名色 35 项 + GTK3 旧色名 22 项；与 settings.ini 共存，仅单行翻转 gtk-application-prefer-dark-theme；新窗口生效） | ✅ 双变体 |
+| ghostty 终端 | ghostty（16 色；新窗口生效 + 已开窗口 wtype 注入热重载） | ✅ 双变体 |
+| **GTK3/4 全应用** | **gtk**（@define-color 覆盖 libadwaita 命名色 35 项 + GTK3 旧色名 22 项；与 settings.ini 共存，仅单行翻转 gtk-application-prefer-dark-theme（gsettings color-scheme 尽力同向）；新窗口生效） | ✅ 双变体 |
 | canvas 三页 | CSS 变量直读 colors.json | ✅ |
 | Qt/Kvantum、编辑器类（VSCode 等） | 未做（Qt 侧可后续走 Kvantum 生成，编辑器主题另议） | ⬜ |
 
@@ -135,9 +136,9 @@ mako/fuzzel/浮层两档均实测同族跟随。
 | 界面 | 生效方式 | 时延 |
 |---|---|---|
 | 状态栏/面板（Noctalia） | watchChanges 热重载 colors.json | 即时 |
-| mako 通知 | theme-mako.sh 内置 makoctl reload | 即时 |
+| mako 通知 | mako 桥内置 makoctl reload | 即时 |
 | fuzzel 启动器 | 每次唤起读配置 | 下次打开 |
-| ghostty 终端 | **已开窗口可热重载**：theme-apply-all 自动注入默认键 ctrl+shift+,（wtype，用户级无需 sudo）→ 已开表面即时换色（2026-10-18 用户发现菜单重载有效，实测打通；根因是 ghostty 文件监视器不触发，非 surface 级限制——此前定论已修正） | 即时 |
+| ghostty 终端 | **已开窗口可热重载**：daemon 的 ghostty 桥自动注入默认键 ctrl+shift+,（wtype，用户级无需 sudo）→ 已开表面即时换色（2026-10-18 用户发现菜单重载有效，实测打通；根因是 ghostty 文件监视器不触发，非 surface 级限制——此前定论已修正） | 即时 |
 | GTK 应用 | 暗/亮跟随 gsettings 即时（libadwaita 内建）；**命名色覆盖（gtk.css）只对新进程生效**，已开应用不重读 | 暗/亮即时、调色板重启 |
 | canvas 三页 | 刷新页面（F5） | 手动 |
 | 键位浮层/悬浮球 | 按键时起进程读色板，重开即新配色 | 下次触发 |

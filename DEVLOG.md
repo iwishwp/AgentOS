@@ -6,6 +6,31 @@
 
 ---
 
+## 2026-10-19（能力长尾收口：L3 指针根治 + 桌面 Electron 统一 CDP 通道）
+
+worktree `feat/input-injection`。两块硬骨头一次收口，L3 从"键盘可靠/指针不可靠"变全通。
+
+- **指针根治（uinput tablet 协议，附录 C）**：旧两路废弃不重走（ydotool 加速度漂移、
+  uinput pointer/触摸屏协议 niri 不消费）。tablet/pen 是第三条路：数字化仪原生绝对坐标，
+  libinput 完整支持，niri 把 pen 映射光标、tip 映射按下。两个拒收门槛烧了两轮才定位：
+  ① BTN_STYLUS=0x14b（0x141 是 eraser）；② ABS 轴必须带非零 resolution——老式
+  uinput_user_dev 没这字段，必须 UI_ABS_SETUP，且内核 struct 布局与网上常见示例不同
+  （absinfo 首字段 value、uinput_setup 是 id 在前）。落地 `scripts/uinput-tablet.py`
+  （纯 ioctl 零依赖）+ `scripts/mouse-click.sh` + udev 规则入镜像（input 组 0660）。
+  证据：计算器连点读回 77、Noctalia ControlCenter 弹层（16px 小目标）、zenity 右键菜单，
+  最后一轮全程无 sudo。
+- **桌面 Electron/Chromium 统一 CDP 通道（附录 D）**：`scripts/app-cdp.mjs`（零依赖，
+  click/key/press/eval/screenshot/targets）；goose desktop 固定 9223（launch 脚本 +
+  `--remote-allow-origins=*`）。实测 goose 模型选择器弹层三证（截图/data-state=open/
+  role=menu），Esc 恢复原状；主会话 chromium（9224）onclick 计数+输入回验。坑：
+  click 必须带 mouseMoved hover 前置（React 弹层无 hover 不开）；spawn 包装用 exec
+  （首测无 exec 的实例疑因 SIGHUP 掉线，exec 后未复现）。
+- 文档：capabilities.md 引言/矩阵/L2+L3 行/打不开清单/升级路径 5、6 收口 + 新附录 C/D；
+  SKILL.md §0/§2（a11y 例外 + app-cdp 命令表）/坑表三行/§5 路由。
+
+---
+
+
 ## 2026-10-18（深夜追加四：goose desktop 落地——首要用户入口 + 两枚深坑定论）
 
 worktree `feat/goose-desktop`。目标：goose 图形版开机自启，成为与用户对话的首要入口。

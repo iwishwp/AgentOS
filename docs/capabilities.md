@@ -3,8 +3,8 @@
 > 结论先行：**不是"任何"，但覆盖面是分层的、可预期的**。L0 系统层与 L2 浏览器层实测全通；
 > L1 无障碍树对 GTK3/GTK4/Qt 应用实测全通（读写点击、无需焦点、不打扰用户），
 > Chromium 树读/文本输入可达（页面点击本走 L2）；X11 分层（GTK3-X11 全通、纯 X11 无树）；
-> Java 未装未测（路径已文档化）；L3 视觉/输入兜底里键盘可靠（wtype 用户级为主力、
-> ydotool sudo 兜底）、指针受硬件加速度拖累。
+> Java 未装未测（路径已文档化）；L3 视觉/输入兜底全通——键盘（wtype 用户级为主力、
+> ydotool sudo 兜底）与指针（uinput tablet 协议绝对坐标，2026-10-19 根治，附录 C）。
 > 每一格的判定都基于真机实测（Fedora aarch64 @ VMware Fusion，niri Wayland 会话），证据出处标注在格内。
 
 图例：✅ 实测可达 · ⚠️ 有条件（条件写明）· ❌ 缺（含补齐路径）
@@ -25,23 +25,24 @@
 | | Qt 应用（Qt5） | ✅ | 2026-10-18 实测（附录 A）：`QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1` 已落 /etc/environment，重启持久（PAM→GDM→niri→spawn 全链验证）；PyQt5 探针窗注册/dump/写/点/读全链通（"你好，重启后"）。QLabel 不实现 Text 接口（文本在 accessible name）——桥已回落 name 读回 |
 | | 同名多实例寻址 | ⚠️ | 本次实证：桌面与水族馆各有一个 gnome-calculator 时，桥按名称解析到先注册者——agent 需自己判别实例（读文本对状态）后再操作，或关掉多余实例 |
 | | Chromium（含 browser-mcp 实例） | ✅（读/文本输入） | 2026-10-18 实测（附录 B），三条件：① `--force-renderer-accessibility`（browser-mcp 已默认带，`AGENTOS_BROWSER_NO_A11Y=1` 可关）；② `toolkit-accessibility=true`（已全局开；**a11y bus 必须在应用启动前启用**，后开无效需重启应用）；③ 树懒构建，AT 调 GetAttributes 触发（桥已内建 prime）。页面元素树完整、按名读文本 ✅；entry 经 grabFocus+wtype 输入 ✅；**按钮 doAction 派发成功但不激活 onclick**（Chromium 155 两会话复现）——页面点击走 L2 CDP 本职 |
-| | Electron（VS Code 等） | ⚠️ | 引擎同源、同 flag 启用（附录 B"Electron"）；VM 无 Electron 应用，未实测，用例出现时按附录 B 步骤验证 |
+| | Electron（goose desktop 等） | ⚠️（读待验/点击 ✅） | 引擎同源、同 flag 启用（附录 B"Electron"）；goose desktop 已带 `--force-renderer-accessibility`（树读待真实用例验证）；**点击已实测 ✅**——不走 a11y 而走 CDP（附录 D：app-cdp.mjs + 固定 9223，模型选择器弹层三证） |
 | | Java (Swing/AWT) | ❌ | 需 Java Access Bridge + GTK look-and-feel；系统仅 headless JDK，未装未测——补齐路径见附录 B"Java" |
 | | X11 老应用（XWayland） | ⚠️（分层） | 2026-10-18 实测（附录 B）：xwayland-satellite 0.8.2 在位在跑（:0）。**GTK3 强制 X11 后端全通**（注册/写/点/读——atk-bridge 走 DBus，与显示后端无关）；**GTK4 X11 后端不注册**（gtk4 a11y 桥绑 Wayland）；**纯 X11 应用（xterm）能跑但无树**——只能 L3 兜底 |
 | | niri 自身 UI（热键浮层/overview） | ❌ | 合成器内部 overlay，不在 AT-SPI 总线（本次实证）；按 Esc 关，输入注入可达 |
 | **L2 浏览器 CDP** | 页面打开/填表/提交/读内容/截图 | ✅ | browser-mcp（Chromium+原生 CDP，水族馆内无头）；M3 退出标准：必应表单全链路 + 遇验证码主动拒绝 |
+| | 桌面 Electron/Chromium 应用点击（app-cdp） | ✅ | 2026-10-19 实测（附录 D）：`scripts/app-cdp.mjs`（click/key/press/eval/screenshot，零依赖）走 Input.dispatchMouseEvent 真实点击语义，绕开 AT-SPI doAction 不触发 onclick 的限制；goose desktop 固定 9223（launch-goose-desktop.sh），实测模型选择器弹层三证（截图/data-state=open/[role=menu]）；主会话 chromium（9224）onclick 计数复验 |
 | **L3 视觉/输入兜底** | grim 截图 | ✅ | 整屏/输出器粒度；水族馆定向截图走 session-mcp（M3） |
 | | wtype 键盘（用户级） | ✅ | 2026-10-18 实测（`scripts/kb-inject.sh`）：文本/可打印键（含 space）与修饰组合键（ctrl+shift+comma→ghostty 热重载）可靠；边界：CJK 可能丢首字符、纯控制键（Return/Tab）对 GTK 不触发——控制键需求回落 ydotool |
 | | ydotool 键盘（sudo） | ✅ | M4 实证（polkit 密码直输、Super+K 弹浮层）；绝对按键可靠、控制键路径全；kb-inject.sh 的回落 |
-| | ydotool 指针 | ⚠️ | 加速度下漂移：libinput 低速加速系数 ≈0.5，绝对定位失准（M2/M4 两代理实证）；且 ydotoold socket 为 root 600，agent 沙箱不可直连，须借 open_app 在真实桌面环境执行（本次任务 2 实证绕行路径） |
+| | 鼠标指针（uinput tablet，`scripts/mouse-click.sh`） | ✅ | **2026-10-19 根治（附录 C）**：虚拟数字化仪 ABS_X/Y + BTN_TOOL_PEN/BTN_TOUCH，绝对坐标无加速度语义，niri 消费 pen→光标、tip→按下；用户级（/dev/uinput input 组 0660，udev 规则入镜像）。实测：计算器连点读回 77、Noctalia 顶栏 ControlCenter 弹层、zenity entry 右键菜单（BTN_STYLUS）。ydotool mousemove -a（加速度漂移）与 uinput pointer/触摸屏协议（niri 不消费）均已废弃 |
 
 ## "哪类应用当前打不开/打不好"
 
-1. **Java 桌面应用**（IDE 如 IntelliJ 系、老 Swing 工具）：无 JAB，L1 不可达；L3 键盘可用但盲打。补齐路径见附录 B"Java"（装完整 JDK + GTK LAF + access bridge，一行启动参数即可验证）。
-2. **纯 X11 老应用**（xterm/motif/自绘 X 工具）：XWayland 下能跑（xwayland-satellite 实证）但无 a11y 树，L1 无从下手，L3 截图+键盘兜底、指针不可靠。**GTK 系 X11 应用不受此限**（GTK3-X11 实测全通）；GTK4 的 X11 后端不注册树（罕见场景，GTK4 应用默认 Wayland）。
-3. **Chromium/Electron 未带 a11y 开关启动的**：树不暴露。本机 browser-mcp 已默认带 flag；第三方 Chromium/Electron 应用需各自带 flag 启动（附录 B），且 a11y bus 必须先于应用启用。
-4. **合成器自身 UI**（浮层/overview/锁屏）：无障碍总线之外，只能 L3 输入注入；水族馆初始热键浮层即此类（本次实证用 Esc 注入关闭）。
-5. **无障碍总线上"无树"的轻量 GUI**（部分 layer-shell 面板、游戏、自绘 UI）：L1 无从下手，L3 截图+键盘兜底，指针不可靠。
+1. **Java 桌面应用**（IDE 如 IntelliJ 系、老 Swing 工具）：无 JAB，L1 不可达；L3 键盘+指针可用（盲打但能点）。补齐路径见附录 B"Java"（装完整 JDK + GTK LAF + access bridge，一行启动参数即可验证）。
+2. **纯 X11 老应用**（xterm/motif/自绘 X 工具）：XWayland 下能跑（xwayland-satellite 实证）但无 a11y 树，L1 无从下手——L3 截图+键盘+指针（mouse-click.sh 绝对坐标）兜底。**GTK 系 X11 应用不受此限**（GTK3-X11 实测全通）；GTK4 的 X11 后端不注册树（罕见场景，GTK4 应用默认 Wayland）。
+3. **Chromium/Electron 未带 a11y 开关启动的**：树不暴露。本机 browser-mcp 已默认带 flag；第三方 Chromium/Electron 应用需各自带 flag 启动（附录 B），且 a11y bus 必须先于应用启用。点击不受此限——带 `--remote-debugging-port` 启动即可走 app-cdp（附录 D）。
+4. **合成器自身 UI**（浮层/overview/锁屏）：无障碍总线之外，只能 L3 输入注入（Esc 键盘、mouse-click.sh 指针均可）；水族馆初始热键浮层即此类（本次实证用 Esc 注入关闭）。
+5. **无障碍总线上"无树"的轻量 GUI**（部分 layer-shell 面板、游戏、自绘 UI）：L1 无从下手，L3 截图+键盘+指针兜底（Noctalia 顶栏即此类，mouse-click.sh 实测命中 ControlCenter）。
 
 （2026-10-18 起 Qt 不再在列——全局开关已落位并实测全通，见附录 A。）
 
@@ -51,7 +52,8 @@
 2. ~~Chromium a11y flag~~ ✅ browser-mcp 已默认带 + 全局 toolkit-accessibility 已开（附录 B）；第三方 Electron 应用统一加 flag 的包装脚本待真实用例；
 3. **X11 桥验证** ✅ 已定论（附录 B：GTK3-X11 全通 / 纯 X11 无树——后者无桥可装，L3 是终点）；
 4. **JAB**（等真实用例出现再装，路径见附录 B）；
-5. **指针精度**：自研受控 uinput 守护（绕开 libinput 加速度，绝对坐标语义）——已有里程碑级挂账（M3 遗留）。
+5. ~~指针精度~~ ✅ 已根治（2026-10-19，附录 C：uinput tablet 协议绝对坐标，mouse-click.sh 用户级）；
+6. ~~桌面 Electron 点击通道~~ ✅ 已统一（2026-10-19，附录 D：app-cdp.mjs + goose 固定 9223）。
 
 ## 端到端证据索引（2026-10-18 goose 真会话，GLM glm-5.3-flash）
 
@@ -178,3 +180,95 @@ xwayland-satellite 0.8.2 在位在跑（`xwayland-satellite :0`，DISPLAY=:0）�
   需要回车/导航键的场景走 ydotool（M4 实证其 evdev 路径全通）；
 - **CJK ⚠️**：wtype 多字符中文可能丢首字符（"潜航员甲"→"航员甲"），type-slow 逐字符缓解，
   关键输入后从 a11y 树读回核对。
+
+## 附录 C：鼠标指针根治——uinput tablet 协议（2026-10-19 VM 实测）
+
+### 排除法与第三条路
+
+两条旧路均废弃（M2/M4 两代理实证，采信未重走）：ydotool `mousemove -a` 受 libinput
+指针加速度拖累（低速加速系数 ≈0.5，绝对定位漂移，1.0.4 溢出钳位+1px 步进虽可用但极慢）；
+自建 uinput **pointer 协议**（REL 转绝对）与**单点触摸屏协议**（ABS_X/Y + BTN_TOUCH），
+niri/smithay 均不消费。
+
+第三条路成立：**tablet/pen 协议**。数字化仪是原生绝对坐标设备，libinput 对 tablet 支持
+完整（无加速度语义），合成器把 pen 位置映射为光标移动、笔尖触底映射为按下——与 wacom
+数位板同一代码路径，GNOME/KDE 同语义。`scripts/uinput-tablet.py`（纯 ioctl+struct，零依赖）
+创建虚拟数字化仪：EV_ABS ABS_X/ABS_Y/ABS_PRESSURE + EV_KEY BTN_TOOL_PEN/BTN_TOUCH/BTN_STYLUS，
+tap 序列 = 入感应区（pen 1）→ 触底（BTN_TOUCH+压力）→ 抬笔 → 出感应区；
+右键 = 触底期间按 BTN_STYLUS（桶键）。`scripts/mouse-click.sh` 封装：`<x> <y> [left|right]`、
+`--move`、`--hold-ms`，屏幕逻辑范围自动从 `niri msg -j outputs` 包围盒取。
+
+### 两个必须的内核细节（libinput 拒收门槛）
+
+初版设备被 libinput 整体忽略，报
+`libinput bug: missing tablet capabilities: btn-stylus resolution`：
+
+1. **BTN_STYLUS 的 keycode 是 0x14b**（0x141 是 BTN_TOOL_RUBBER/eraser，写错等于注册了
+   橡皮擦工具而没注册桶键）；
+2. **ABS_X/ABS_Y 必须带非零 resolution**（单位/毫米）。老式 `uinput_user_dev` 全量写入
+   **没有** resolution 字段，必须走 `UI_ABS_SETUP` ioctl——且注意
+   `struct uinput_abs_setup = {u16 code; struct input_absinfo absinfo}`（28 字节，
+   absinfo 首字段是 **value**，随后 minimum/maximum/fuzz/flat/resolution），
+   `struct uinput_setup` 是 **id 在前 name 在后**（{input_id; name[80]; ff_effects_max}）。
+   照网上常见的 24 字节/名字在前布局打包，内核直接 EINVAL。
+
+resolution 数值本身不影响落点（合成器按 [0,1] 归一化映射输出），给 40（数位板量级）即可。
+ABS 轴范围 = 屏幕逻辑范围 → 坐标系即 niri 逻辑坐标。
+
+### 权限（用户级）
+
+/dev/uinput 默认 root:600。方案：udev 规则 `KERNEL=="uinput", MODE="0660", GROUP="input"`
+（`os/configs/udev/60-agentos-uinput.rules`，已入镜像 Containerfile）+ 桌面用户入 input 组
+（`usermod -aG input <user>`，重新登录生效——SSH 新会话即够）。回落：SUDO_PW + sudo
+（kb-inject.sh 同款）。设备即建即毁（热插拔），无残留状态；注入全局生效，不依赖调用方
+在哪个会话。
+
+### 实测证据（VM 1280x800 / niri 26.04 / kernel 6.19）
+
+- **libinput 识别**：`libinput list-devices` → "AgentOS Virtual Tablet"，Capabilities: tablet，
+  无拒收告警；
+- **左键点击精度**：gnome-calculator 连点 "7"(726,613) 两次 → a11y 树读回显示区 `77`，
+  截图同步见 77 与 7 键高亮；
+- **真实 UI 小目标**：Noctalia 顶栏 ControlCenter 图标（915,15，约 16px 宽）命中弹出控制
+  中心面板（截图证据），复点关闭；
+- **右键**：zenity entry（640,410）右键 → GTK 上下文菜单（剪切/复制/粘贴/全选）弹出（截图证据）；
+- **用户级**：以上 ControlCenter 命中/关闭一轮走 `mouse-click.sh` 无 sudo 完成
+  （input 组新会话）。
+
+## 附录 D：桌面 Electron/Chromium 统一 CDP 通道（2026-10-19 VM 实测）
+
+### 动机与形态
+
+AT-SPI `doAction` 对 Chromium 系按钮"派发成功但不触发 onclick"（附录 B，Chromium 155
+两会话复现），桌面 Electron 应用一直缺可靠点击路径。统一通道 `scripts/app-cdp.mjs`
+（零依赖单文件，Node 22 全局 WebSocket/fetch，与 browser-mcp 的 CDP 客户端同构但独立
+最小实现）：
+
+- `click <x> <y> [--button left|right|middle] [--count n]`：Input.dispatchMouseEvent，
+  序列 **mouseMoved → mousePressed → mouseReleased**——hover 前置是必须的（实测 goose 的
+  React 弹层无 hover 不开：无 mouseMoved 的首击未展开，补上后三证齐全）；
+- `key "文本"`（Input.insertText）/ `press Enter|Tab|Escape|...`（dispatchKeyEvent 控制键）；
+- `eval "js"`（Runtime.evaluate——查 getBoundingClientRect 拿精确点击坐标）；
+- `screenshot <path>` / `targets`（端口发现调试）。
+
+坐标语义：应用客户区 CSS 像素（viewport 原点=窗口左上，不含系统装饰）。端口约定：
+**goose desktop 9223**（`launch-goose-desktop.sh` 固定 `--remote-debugging-port=9223` +
+`--remote-allow-origins=*`；与水族馆 chromium 的 9222 区分，仅 127.0.0.1 可达）；其他应用
+`--remote-debugging-port` 自选 + `--port` 指定。
+
+### 实测证据
+
+- **goose desktop（Electron 150 / X11 后端）**：`eval` 查得模型选择器 trigger（glm-5.3-flash，
+  116,426）→ `click` → 弹层展开三证：CDP 截图（模型列表含 GLM/glm-5.3-flash/200K）、DOM
+  `data-state="open"`、`[role=menu]` 存在 → `press Escape` 关闭，布局恢复原状（对比前后截图）；
+- **主会话 chromium（Chromium 155 / ozone wayland / 临时 profile / 9224）**：本地测试页
+  `click`×2 → onclick 计数 "被点了 2 次"；`key` 输入 → input 事件回显 "输入:hello-app-cdp"；
+  `press Enter/Tab` 正常，端口全程存活。
+
+### 与既有层的关系
+
+页面内操作（agent 专属浏览器）仍走 L2 browser 扩展（browser_eval 一步到位）；app-cdp
+补的是**桌面用户会话里的** Electron/Chromium 应用（goose desktop 首位用户），二者共用
+CDP 语义、端口隔离。L3 mouse-click.sh 与 app-cdp 的分工：应用带 CDP 端口 → app-cdp
+（不依赖屏幕坐标、不受窗口遮挡影响）；无端口（xterm/游戏/合成器 UI/未开调试的自拉应用）
+→ mouse-click.sh（屏幕绝对坐标）。

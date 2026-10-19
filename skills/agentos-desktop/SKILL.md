@@ -14,12 +14,15 @@ description: 操作 AgentOS 桌面（niri/Wayland）：窗口与工作区管理�
 1. **L0 系统层**——窗口/工作区/启动/文件/通知/剪贴板（niri/desktop/system/files 扩展）：最稳，优先用；
 2. **L1 无障碍树**——GUI 应用内按名称点击/读写文本（a11y 扩展，AT-SPI2）：无需焦点、不打扰用户，
    GTK3/GTK4/Qt 实测全通（Qt 的全局开关与 Chromium 的 toolkit-accessibility 已是系统默认，
-   2026-10-18 起）；Chromium 树读/文本输入可达（**页面点击走 L2**）；Java 未装（路径见
+   2026-10-18 起）；Chromium 树读/文本输入可达（**页面点击走 L2 或 app-cdp**）；Java 未装（路径见
    capabilities.md 附录 B）；纯 X11 应用（xterm 类）无树，只能 L3；
 3. **L2 浏览器 CDP**——网页一切操作（browser 扩展，agent 专属无头 Chromium）；
+   **桌面 Electron/Chromium 应用**（goose desktop 等）点按钮走 `scripts/app-cdp.mjs`
+   （统一 CDP 通道，Input.dispatchMouseEvent 真实点击；goose 固定端口 9223）；
 4. **L3 视觉/输入兜底**——grim 截图（可靠）、键盘注入（`scripts/kb-inject.sh`：wtype 用户级
-   为主力，文本/组合键可靠；控制键（回车/Tab）回落 ydotool 需 sudo）、指针注入（**不可靠**：
-   加速度下漂移，只作最后手段）。
+   为主力，文本/组合键可靠；控制键（回车/Tab）回落 ydotool 需 sudo）、指针注入（
+   `scripts/mouse-click.sh`：uinput tablet 协议**绝对坐标、可靠、用户级**（2026-10-19 根治，
+   见 capabilities.md 附录 C）；无 a11y 树的应用（xterm/游戏/合成器自身 UI）也能点）。
 
 遇到"打不开/打不好"的应用：先想是不是 L1 前置条件没满足（a11y 开关），再用 L3 截图看真实状态，
 不要盲目重试。
@@ -95,7 +98,9 @@ extensions:
 注册后才完整；同名多实例时桥解析到先注册者——先读文本对状态判别实例，必要时关掉多余实例。
 Chromium 例外注意：树懒构建（桥自动触发，首次 dump 多等 1-2 秒属正常）；**写文本框用
 "grabFocus + kb-inject type"组合**（Chromium 的 entry 不吃 setTextContents）；页面**按钮点击
-不生效**（doAction 派发但 onclick 不跑），页面操作一律走 browser 扩展。
+不生效**（doAction 派发但 onclick 不跑）——agent 专属浏览器内的页面走 browser 扩展，
+**桌面 Electron/Chromium 应用**（goose desktop、主会话开的 chromium 等）走 `scripts/app-cdp.mjs`
+（见下"桌面 Electron/Chromium 应用点击"）。
 
 ### browser —— 网页操作（L2，agent 专属无头 Chromium）
 | 工具 | 用途 | 关键参数 |
@@ -106,6 +111,20 @@ Chromium 例外注意：树懒构建（桥自动触发，首次 dump 多等 1-2 
 
 填表标准动作：`el.value = "..."` 后必须 `el.dispatchEvent(new Event("input", {bubbles: true}))`，
 否则现代框架收不到输入。**遇验证码：停下告知用户，绝不自动绕过。**
+
+### 桌面 Electron/Chromium 应用点击（L2 通道，`scripts/app-cdp.mjs`）
+| 命令 | 用途 |
+|---|---|
+| `app-cdp.mjs targets [--port p]` | 列 CDP target（端口不通时先看这个） |
+| `app-cdp.mjs screenshot out.png` | 应用客户区截图（坐标就用这个图的像素） |
+| `app-cdp.mjs click <x> <y> [--button left\|right] [--count n]` | **真实点击**（mouseMoved→Pressed→Released，hover 前置必须） |
+| `app-cdp.mjs key "文本"` / `press Enter` | 文本输入 / 控制键 |
+| `app-cdp.mjs eval "js"` | DOM 查询（getBoundingClientRect 拿精确点击坐标） |
+
+端口约定：goose desktop **9223**（launch-goose-desktop.sh 固定）；水族馆 chromium 9222；
+自拉的应用用 `--remote-debugging-port` 自选并 `--port` 指定。坐标是应用客户区 CSS 像素
+（不含窗口装饰）；流程：screenshot/eval 定位 → click → screenshot 验证。实测（2026-10-19）：
+goose 模型选择器弹层展开三证齐全（截图 + data-state=open + [role=menu]）。
 
 ### files —— 文件沙箱（L0，根 = `~/Agent/`，路径都写相对）
 | 工具 | 用途 | 关键参数 |
@@ -170,8 +189,11 @@ Chromium 例外注意：树懒构建（桥自动触发，首次 dump 多等 1-2 
 | Qt 应用不出现在 a11y 总线 | `a11y_list_apps` 看不到 | 系统已全局开（/etc/environment 的 `QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1`，重启持久）；仍看不到=应用启动早于环境落位或非 Qt 官方绑定，重启应用 |
 | Chromium/Electron a11y 树为空 | dump 不出内容 | ① 启动带 `--force-renderer-accessibility`（browser 扩展已默认带）；② `toolkit-accessibility` 必须在**应用启动前**为 true（已全局开；后改无效，须重启应用）；③ 树懒构建，dump 一次让桥触发（见 §2 a11y 纪律） |
 | 键盘注入选型 | 需要打字/快捷键 | `scripts/kb-inject.sh`：文本与组合键用 wtype（用户级）；**回车/Tab 等控制键 wtype 对 GTK 不生效**，走 ydotool（sudo）；中文可能丢首字符，输完从 a11y 树读回核对 |
-| 水族馆初始有 niri 热键浮层 | 截图被"Important Hotkeys"遮挡 | 注入 Esc 关闭；agent 沙箱里连不上 ydotoold socket（root 600），借 `niri__open_app` 在真实桌面环境执行注入 |
-| ydotool 指针漂移 | 绝对定位失准（libinput 加速度 ≈0.5） | 指针不可依赖；键盘注入可靠；socket 路径注意 `/tmp/.ydotool_socket` vs `$XDG_RUNTIME_DIR` 的版本差异 |
+| 指针注入选型 | 需要鼠标点击 | `scripts/mouse-click.sh <x> <y> [left\|right]`：uinput tablet 协议绝对坐标（用户级，2026-10-19 根治）。ydotool mousemove -a 已弃用（加速度漂移）；uinput tablet 两个内核细节见 capabilities.md 附录 C（BTN_STYLUS=0x14b、ABS 轴必须带 resolution） |
+| app-cdp 点击没反应 | Electron 弹层不开 | click 已带 mouseMoved hover 前置；仍不开先 `eval` 用 elementFromPoint 核对坐标对应元素；目标应用必须带 `--remote-debugging-port` 启动 |
+| /dev/uinput 不可写 | mouse-click.sh 报权限 | 用户级=udev 规则（input 组 0660，镜像已带）+ 用户入 input 组（重新登录）；或回落 SUDO_PW 环境变量 + sudo |
+| 水族馆初始有 niri 热键浮层 | 截图被"Important Hotkeys"遮挡 | 注入 Esc 关闭；键盘用 kb-inject（wtype 用户级）；ydotool 路径需 sudo（ydotoold socket root 600） |
+| ydotool 指针漂移（历史） | 绝对定位失准（libinput 加速度 ≈0.5） | 已被 mouse-click.sh 取代，勿再走 ydotool 指针；socket 路径注意 `/tmp/.ydotool_socket` vs `$XDG_RUNTIME_DIR` 的版本差异 |
 | GTK4 树初始不完整 | dump 只有十几个节点 | 先 `a11y_list_apps`/dump 一次让 AT 客户端注册，再 dump 才完整（16→105 节点实测） |
 | 无头跑 T1/T2 确认 | 30s/300s 无人应答自动拒绝 | 预期行为：写操作需要用户在场，或测试时经 `org.agentos.Confirm1.Respond` 编程应答 |
 | 装包被 packagekitd 抢锁 | dnf 偶发失败 | 装前 `systemctl stop packagekit`（T2 helper 已处理） |
@@ -180,6 +202,9 @@ Chromium 例外注意：树懒构建（桥自动触发，首次 dump 多等 1-2 
 
 L0（系统层，永远先试）→ L1（a11y：GTK3/4/Qt 已默认可达；Chromium 检查 flag 与
 toolkit-accessibility 顺序；第三方 Electron 按 capabilities.md 附录 B 加 flag）→
-L2（网页类必走）→ L3 兜底（grim 看 + kb-inject 键盘；指针不可靠）。
-仍打不开的类型：纯 X11 应用（xterm 类，无树，L3 是终点）、Java（需 JAB，路径见
-capabilities.md 附录 B）、合成器自身 UI 只能输入注入——详表见仓库 `docs/capabilities.md`。
+L2（网页类必走；**桌面 Electron/Chromium 点击走 `scripts/app-cdp.mjs`**，应用须带
+`--remote-debugging-port` 启动，goose desktop 已固定 9223）→
+L3 兜底（grim 看 + kb-inject 键盘 + **mouse-click.sh 指针（绝对坐标、可靠、用户级）**——
+无 a11y 树、无 CDP 端口的应用（xterm/游戏/合成器 UI）也能点）。
+仍打不开的类型：纯 X11 应用（xterm 类，无树，L3 已可点击+键盘）、Java（需 JAB，路径见
+capabilities.md 附录 B）——详表见仓库 `docs/capabilities.md`。

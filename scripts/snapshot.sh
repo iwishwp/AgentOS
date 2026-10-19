@@ -19,6 +19,7 @@ usage() {
 用法:
   snapshot.sh create [描述]     创建只读快照（描述自动加前缀 agentos-pre-，缺省 manual）
   snapshot.sh list [--desc]     列出快照；--desc 只看 agentos-pre-* 条目
+  snapshot.sh list --json       列出快照（JSON 数组，供 canvas /settings 等程序消费）
   snapshot.sh delete <编号>     删除指定快照
   snapshot.sh rollback <编号>   打印回滚步骤（不直接执行，含重启说明）
 环境变量: SNAPPER_CONFIG（默认 root）
@@ -65,7 +66,16 @@ case "${1:-help}" in
     if [ $# -gt 0 ]; then
       case "$1" in
         --desc) snap_json | read_snapshots | grep "agentos-pre-" || echo "（暂无 agentos-pre-* 快照）" ;;
-        *) die "list 可选参数: --desc（只看 agentos 快照）" ;;
+        --json) # 机器可读：[{number,date,description},...]（canvas /settings 的系统分区）
+          snap_json | CONFIG_NAME="$CONFIG" python3 -c '
+import json, os, sys
+d = json.load(sys.stdin)
+snaps = d.get(os.environ["CONFIG_NAME"]) if isinstance(d, dict) else d
+out = [{"number": s["number"], "date": s.get("date",""), "description": s.get("description","")}
+       for s in snaps or []]
+json.dump(out, sys.stdout)'
+          ;;
+        *) die "list 可选参数: --desc（只看 agentos 快照）/ --json（机器可读）" ;;
       esac
     else
       $SN list

@@ -18,6 +18,7 @@ import { settingsPageHtml } from "./settings-page.js";
 import {
   AGENTOS_UNITS,
   applyAppearance,
+  noctaliaSettingsPath,
   listSnapshots,
   probeSettingsDaemon,
   readSettingsState,
@@ -97,6 +98,8 @@ export function createCanvasServer(
     stateFile?: string;
     settingsSocket?: string;
     settingsCli?: string;
+    /** noctalia settings.json（外观切换先翻这里的 darkMode 真相） */
+    noctaliaSettings?: string;
     snapshotScript?: string;
     exportScript?: string;
     credPolicyPath?: string;
@@ -117,6 +120,7 @@ export function createCanvasServer(
   const stateFile = opts.stateFile ?? paths.stateFile;
   const settingsSocket = opts.settingsSocket ?? paths.socketPath;
   const settingsCli = opts.settingsCli ?? paths.settingsCli;
+  const noctaliaSettings = opts.noctaliaSettings ?? noctaliaSettingsPath();
   const snapshotScript = opts.snapshotScript ?? paths.snapshotScript;
   const exportScript = opts.exportScript ?? paths.exportScript;
   const credPolicyPath = opts.credPolicyPath ?? DEFAULT_CRED_POLICY_PATH;
@@ -395,7 +399,7 @@ export function createCanvasServer(
         response.end(JSON.stringify({ ok: false, detail: "variant 须为 dark|light" }));
         return;
       }
-      const r = await applyAppearance(runner, settingsCli, stateFile, variant as AppearanceVariant);
+      const r = await applyAppearance(runner, settingsCli, stateFile, variant as AppearanceVariant, noctaliaSettings);
       const daemon = await probeSettingsDaemon(settingsSocket);
       response.writeHead(r.ok ? 200 : 500, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
       response.end(JSON.stringify({ ...r, daemon }));

@@ -69,7 +69,11 @@ import_one() {  # <包内文件> <home 相对路径>
     else
       KEPT_DIFF=$((KEPT_DIFF+1))
       echo "  ≠ $rel 已存在且不同（保留本机版本，不覆盖）差异摘要:"
-      diff -u "$target" "$f" 2>/dev/null | sed 's/^/      /' | head -n 14 | sed 's/^      /    /'
+      # diff 有差异时 exit 1——pipefail+set -e 会把整个导入杀在半路，必须 || true；
+      # 报告里 KEY=value 形态的敏感值打码（diff 双侧都打——本机的真值也不该被复述到终端日志）
+      { diff -u "$target" "$f" 2>/dev/null || true; } \
+        | sed -E 's/(API_KEY|TOKEN|SECRET|PASSWORD|PASS|KEY)=[^[:space:]]+/\1=«redacted»/g' \
+        | sed 's/^/    /' | head -n 14
     fi
   else
     if [ "$APPLY" -eq 1 ]; then

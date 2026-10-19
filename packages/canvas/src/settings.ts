@@ -26,6 +26,35 @@ export interface SettingsState {
   bridges: Record<string, string>;
 }
 
+/** Noctalia 主配置（colorSchemes.darkMode 是变体真相——daemon watcher 只认真相） */
+export function noctaliaSettingsPath(env: NodeJS.ProcessEnv = process.env): string {
+  const home = env.HOME ?? os.homedir();
+  return env["AGENTOS_NOCTALIA_SETTINGS"] ?? path.join(home, ".config", "noctalia", "settings.json");
+}
+
+/**
+ * 翻真相：改 noctalia settings.json 的 colorSchemes.darkMode（保持其余键不动）。
+ * 只做这一个键的外科修改——这是 Noctalia 面板自己的切换路径，daemon watcher 盯着它。
+ * 文件缺失/坏 JSON：返回 false（调用方降级为强制变体 apply，行为同旧路）。
+ */
+export function flipDarkMode(file: string, dark: boolean): boolean {
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, unknown>;
+  } catch {
+    return false;
+  }
+  const cs = (parsed["colorSchemes"] ?? {}) as Record<string, unknown>;
+  cs["darkMode"] = dark;
+  parsed["colorSchemes"] = cs;
+  try {
+    fs.writeFileSync(file, JSON.stringify(parsed, null, 2) + "\n", "utf8");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** 仓库根（dist: packages/canvas/dist → ../../..；src/test: packages/canvas/src → ../../..） */
 export function repoRoot(): string {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -172,25 +201,41 @@ export type AppearanceVariant = "dark" | "light";
 export interface ApplyResult {
   ok: boolean;
   detail: string;
+  /** 真相是否翻转成功（false = 降级为强制变体，daemon watcher 可能按旧真相回滚） */
+  truthFlipped: boolean;
   state: SettingsState | null;
 }
 
-/** 外观切换：起 settings-daemon CLI 子进程（canvas 不自己跑桥），完成后回读状态快照 */
+/**
+ * 外观切换。语义（实测教训 2026-10-19：只强制变体会被 daemon watcher 立即回滚——
+ * 真相是 noctalia settings.json 的 colorSchemes.darkMode）：
+ *   ① 翻真相文件 darkMode → ② 起 settings-daemon CLI apply（auto：读真相、跑五桥）。
+ * canvas 仍不做编排，只是"改真相 + 请 daemon 收敛"。真相文件不可写时降级为
+ * apply --dark/--light（行为同 D-Bus Apply(s)，可能与 watcher 短暂打架）。
+ */
 export async function applyAppearance(
   runner: CommandRunner,
   settingsCli: string | null,
   stateFile: string,
   variant: AppearanceVariant,
+  noctaliaSettings?: string,
 ): Promise<ApplyResult> {
   if (!settingsCli) {
-    return { ok: false, detail: "找不到 agentos-settings CLI（packages/settings-daemon/dist/cli.js）", state: readSettingsState(stateFile) };
+    return {
+      ok: false,
+      detail: "找不到 agentos-settings CLI（packages/settings-daemon/dist/cli.js）",
+      truthFlipped: false,
+      state: readSettingsState(stateFile),
+    };
   }
-  const r = await runner.run(process.execPath, [settingsCli, "apply", `--${variant}`]);
+  const truthFile = noctaliaSettings ?? noctaliaSettingsPath();
+  const truthFlipped = flipDarkMode(truthFile, variant === "dark");
+  const r = await runner.run(process.execPath, [settingsCli, "apply", ...(truthFlipped ? [] : [`--${variant}`])]);
   const state = readSettingsState(stateFile);
   if (r.code !== 0) {
-    return { ok: false, detail: (r.stderr.trim() || r.stdout.trim() || `exit ${r.code}`).slice(0, 500), state };
+    return { ok: false, detail: (r.stderr.trim() || r.stdout.trim() || `exit ${r.code}`).slice(0, 500), truthFlipped, state };
   }
-  return { ok: true, detail: r.stdout.trim(), state };
+  return { ok: true, detail: r.stdout.trim(), truthFlipped, state };
 }
 
 export interface ExportResult {

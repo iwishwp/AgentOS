@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createCanvasServer } from "../src/server.js";
 import {
   applyAppearance,
+  flipDarkMode,
   listSnapshots,
   probeSettingsDaemon,
   readSettingsState,
@@ -73,10 +74,13 @@ beforeAll(async () => {
   runner.on(["apply", "--dark"], { stdout: "applied" });
   runner.on(["--with-secrets"], { stdout: "已打包 8 个文件\nEXPORTED_PATH=/tmp/agentos-state-x.tar.gz" });
   runner.on([], { stdout: "已打包 8 个文件\nEXPORTED_PATH=/tmp/agentos-state-plain.tar.gz" });
+  fs.writeFileSync(path.join(dir, "noctalia.json"), JSON.stringify({ colorSchemes: { darkMode: true } }));
+  runner.on(["/fake/settings-cli.js", "apply"], { stdout: "ok" });
   server = createCanvasServer(path.join(dir, "canvas"), {
     runner,
     stateFile,
     settingsSocket: socketPath,
+    noctaliaSettings: path.join(dir, "noctalia.json"),
     settingsCli: "/fake/settings-cli.js",
     snapshotScript: "/fake/snapshot.sh",
     exportScript: "/fake/export.sh",
@@ -133,12 +137,32 @@ describe("settings 后端单元", () => {
     expect(none.error).toContain("找不到");
   });
 
-  it("外观切换经 CLI 子进程：args 携带 apply --dark；CLI 失败如实带回", async () => {
+  it("flipDarkMode：只动 colorSchemes.darkMode 一个键，其余原样", () => {
+    const f = path.join(dir, "noctalia-settings.json");
+    fs.writeFileSync(f, JSON.stringify({ colorSchemes: { darkMode: true, accent: "#abc" }, wallpaper: "/w.png" }));
+    expect(flipDarkMode(f, false)).toBe(true);
+    const after = JSON.parse(fs.readFileSync(f, "utf8"));
+    expect(after.colorSchemes).toEqual({ darkMode: false, accent: "#abc" });
+    expect(after.wallpaper).toBe("/w.png");
+    expect(flipDarkMode(path.join(dir, "坏.json"), true)).toBe(false); // 文件不在 → false 不炸
+  });
+
+  it("外观切换：先翻真相再 apply auto；真相不可写降级强制变体；CLI 失败如实带回", async () => {
+    const truth = path.join(dir, "noctalia-settings.json");
+    fs.writeFileSync(truth, JSON.stringify({ colorSchemes: { darkMode: true } }));
     const r = new FakeRunner();
-    r.on(["/fake/cli.js", "apply", "--dark"], { stdout: "ok" });
-    const res = await applyAppearance(r, "/fake/cli.js", stateFile, "dark");
+    r.on(["/fake/cli.js", "apply"], { stdout: "ok" });
+    const res = await applyAppearance(r, "/fake/cli.js", stateFile, "dark", truth);
     expect(res.ok).toBe(true);
-    expect(r.lastArgs()).toEqual(["/fake/cli.js", "apply", "--dark"]);
+    expect(res.truthFlipped).toBe(true);
+    expect(r.lastArgs()).toEqual(["/fake/cli.js", "apply"]); // auto：读真相收敛
+    expect(JSON.parse(fs.readFileSync(truth, "utf8")).colorSchemes.darkMode).toBe(true);
+    // 真相文件缺失 → 降级 --dark
+    const r2 = new FakeRunner();
+    r2.on(["apply", "--dark"], { stdout: "ok" });
+    const res2 = await applyAppearance(r2, "/fake/cli.js", stateFile, "dark", path.join(dir, "无.json"));
+    expect(res2.truthFlipped).toBe(false);
+    expect(r2.lastArgs()).toEqual(["/fake/cli.js", "apply", "--dark"]);
     const fail = await applyAppearance(new FakeRunner(), "/fake/cli.js", stateFile, "light");
     expect(fail.ok).toBe(false);
     expect(fail.detail).toBeTruthy();
@@ -198,8 +222,10 @@ describe("/settings 路由", () => {
     expect(ok.status).toBe(200);
     const d = JSON.parse(ok.body);
     expect(d.ok).toBe(true);
+    expect(d.truthFlipped).toBe(true);
     expect(d.state.paletteVariant).toBe("dark");
-    expect(runner.lastArgs()).toEqual(["/fake/settings-cli.js", "apply", "--dark"]);
+    expect(runner.lastArgs()).toEqual(["/fake/settings-cli.js", "apply"]); // auto 收敛
+    expect(JSON.parse(fs.readFileSync(path.join(dir, "noctalia.json"), "utf8")).colorSchemes.darkMode).toBe(true);
   });
 
   it("POST 未知名单外路径照旧 405", async () => {

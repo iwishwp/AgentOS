@@ -1,0 +1,12 @@
+# AgentOS：uinput 用户级开放（L3 指针注入的权限基座）
+#
+# /dev/uinput 默认 root:600，而 mouse-click.sh（uinput tablet 协议绝对坐标点击）
+# 需要写它。放 input 组 0660：桌面用户入 input 组后即可用户级注入，无需 sudo
+# （与 ydotool 官方推荐配置同构；ydotool 在本机走 root 守护 + sudo 回落，见
+# scripts/kb-inject.sh）。
+#
+# 部署：本文件随镜像 COPY 到 /etc/udev/rules.d/（见 os/bootc/Containerfile）；
+# 存量机器手动：sudo cp 本文件 /etc/udev/rules.d/ && sudo udevadm control --reload \
+#   && sudo udevadm trigger /dev/uinput && sudo usermod -aG input <桌面用户>
+# 注意 usermod 后需重新登录（SSH 新会话即生效）。
+KERNEL=="uinput", MODE="0660", GROUP="input"

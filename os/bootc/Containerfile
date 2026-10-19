@@ -143,6 +143,10 @@ RUN if [ "$GOOSE_INSTALL_MODE" = "build" ]; then \
 # 实测依据 docs/capabilities.md 附录 A（2026-10-18）。
 RUN echo 'QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1' >> /etc/environment
 
+# L3 指针注入的权限基座：/dev/uinput 放开到 input 组 0660（桌面用户随装机入组），
+# mouse-click.sh（uinput tablet 协议绝对坐标点击）得以用户级运行。规则说明见文件头。
+COPY os/configs/udev/60-agentos-uinput.rules /etc/udev/rules.d/
+
 # 配置部署策略（与 /etc/skel 方案的取舍，详见 docs/m5-atomic.md §配置分发）：
 #   不可变默认放 /usr/share/agentos/defaults/（随镜像版本走），
 #   首启动 user 单元 only-if-absent 复制进 ~/.config（不覆盖用户改动，

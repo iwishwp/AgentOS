@@ -20,6 +20,11 @@
 #    会话下 login keyring 永远锁着，safeStorage 默认路径会弹 gcr 解锁框并卡住
 #    主窗口（实测 2026-10-18）；basic 存本地文件，密钥本就走 goose.env 注入，
 #    safeStorage 里没有需要钥匙串保护的凭据。
+# 5. --remote-debugging-port=9223 —— 统一 CDP 通道：AT-SPI 对 Chromium 系按钮
+#    doAction 不触发 onclick（附录 B），桌面 Electron 点击走 scripts/app-cdp.mjs
+#    （Input.dispatchMouseEvent 真实点击语义）。固定 9223 与水族馆 browser-mcp
+#    chromium 的 9222 区分；--remote-allow-origins=* 允许本机任意工具连（同机
+#    127.0.0.1 才可达，无外网面；goose desktop CDP 实证配置）。
 #
 # desktop 本体：/usr/lib/Goose/Goose（RPM Goose-1.55.0-1.arm64，Electron+React，
 # 内置 goose CLI 1.55 于 resources/bin/，读同一份 ~/.config/goose/config.yaml，
@@ -43,4 +48,6 @@ exec "$DESKTOP_BIN" \
   --ozone-platform=x11 \
   --force-renderer-accessibility \
   --password-store=basic \
+  --remote-debugging-port=9223 \
+  --remote-allow-origins='*' \
   "$@"

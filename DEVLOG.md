@@ -6,6 +6,38 @@
 
 ---
 
+## 2026-10-19（settings-ui：AgentOS 自己的系统设置页 + 凭据管理 + 多机器迁移）
+
+worktree `feat/settings-ui`。三个系统级功能一轮落地：①canvas `/settings` 设置页
+（外观/凭据/系统/迁移四分区，与 /keys /replay /artifacts 并列，桌面条目
+`agentos-app-settings.desktop` 独立窗口）；②凭据管理 UI（列表/一键吊销三步事务）；
+③`agentos-state-export/import.sh` 状态迁移（only-if-absent + 差异报告，docs/migration.md）。
+
+- **外观切换的真话**：实测只调 `agentos-settings apply --dark` 会被 daemon watcher
+  按真相（noctalia settings.json 的 darkMode）立即回滚。页面按钮改为
+  翻真相（只动 colorSchemes.darkMode 一个键）+ CLI apply auto 收敛；
+  像素抽查状态栏 #efefde→#302f23 全系统联动。
+- **凭据零明文（UI 侧对应物）**：keyring 只用 `secret-tool search --all` 探存在性
+  （lookup 连存在性检查都不许）；吊销 = clear → yaml 缩进块手术（保注释、写前 YAML
+  校验、tmp+rename 原子）→ 审计 credential_revoke；全程明文 grep 零命中（VM 实测）。
+- **迁移脚本三枚坑**：①collect 相对路径少了 `.config` 的点（打了个只含 goose.env 的
+  包还以为自己环境抖动）；②`$VAR` 后紧跟全角字符会被 bash 并进变量名（set -u 误报
+  unbound）——一律 `${VAR}`；③`diff` 有差异时 exit 1 × pipefail × set -e 把导入杀在
+  半路（VM 命中：出差异报告后剩余文件全漏装）——diff 管道 `|| true`，且报告里
+  KEY=value 双侧打码。
+- **chromium X11 后端**：本机 chromium 默认 X11，ssh/启动器起 `--app` 直接报
+  Missing X server——桌面条目必须 `--ozone-platform=wayland`（browser-mcp 同款），
+  另加 `--disable-gpu` + 隔离 user-data-dir 才稳定（GPU transient failure/zygote 断管道）。
+- **sudoers 只读条目**（VM）：`/etc/sudoers.d/agentos-snapper-readonly`——仅
+  `snapper --jsonout -c root list` 两条 NOPASSWD，让设置页快照分区可用；
+  无此条目时页面如实报错（snapper 要 root 是事实，不藏）。
+- 测试：全仓 298/298（基线 270 + canvas 新增 28：吊销事务 fixture、策略块手术、
+  路由 405 白名单、search-never-lookup）。文档：settings-ui.md（新）、migration.md（新）、
+  settings-daemon.md §7 UI、theming §7 消费方表改四页。
+- 遗留：1Password/Bitwarden 后端接入、首次启动分步引导、暗色档页面实拍留档。
+
+---
+
 ## 2026-10-18（深夜追加四：goose desktop 落地——首要用户入口 + 两枚深坑定论）
 
 worktree `feat/goose-desktop`。目标：goose 图形版开机自启，成为与用户对话的首要入口。

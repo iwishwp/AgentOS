@@ -6,8 +6,9 @@ Comment=AgentOS system settings (appearance / credentials / system / migration)
 Comment[zh_CN]=AgentOS 系统设置（外观 / 凭据 / 系统 / 迁移）——canvas /settings 页
 # 与"系统设置"（Noctalia 面板，qs -c noctalia ipc call settings open）并列的独立条目：
 # Noctalia 管它自己的面板，这里管 AgentOS 的。部署到 ~/.local/share/applications/。
-# chromium --app 独立窗口；--password-store=basic：keyring 锁死网络栈的 M3 教训（browser-mcp 同款）
-Exec=chromium-browser --app=http://127.0.0.1:7788/settings --password-store=basic
+# --ozone-platform=wayland：本机 chromium 默认 X11 后端会直接起不来（browser-mcp 同款教训）；
+# chromium --app 独立窗口；--password-store=basic：keyring 锁死网络栈的 M3 教训
+Exec=chromium-browser --ozone-platform=wayland --app=http://127.0.0.1:7788/settings --password-store=basic
 Icon=org.gnome.Settings
 Terminal=false
 Categories=Settings;System;

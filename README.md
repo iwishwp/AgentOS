@@ -58,6 +58,7 @@ Atomic 镜像（bootc，需 podman）：`./scripts/build-image.sh --smoke`，
 - [凭据代理与密码管理集成](docs/security/credentials.md)
 - [权限分级 v1（三档/portal/polkit）](docs/permissions.md)
 - [会话录屏与回放](docs/session-recording.md)
+- [设置守护进程](docs/settings-daemon.md) · [系统设置页 /settings](docs/settings-ui.md) · [多机器状态迁移](docs/migration.md)
 - [goose 接入说明](docs/goose-integration.md)
 - [能力矩阵（agent 能操作哪些应用）](docs/capabilities.md) · [桌面操作 skill（任何 agent 框架可移植）](skills/agentos-desktop/SKILL.md)
 - [真机安装与验证手册](docs/real-machine.md)

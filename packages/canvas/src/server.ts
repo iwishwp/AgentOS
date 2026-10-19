@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
+import type { CommandRunner } from "@agentos/proc";
+import { ShellRunner } from "@agentos/proc";
 import {
   DEFAULT_AUDIT_PATH,
   DEFAULT_RECORDINGS_DIR,
@@ -12,6 +14,25 @@ import { DEFAULT_NIRI_CONFIG, readKeys } from "./keys.js";
 import { DEFAULT_COLORS_JSON, keysPageHtml, loadColors } from "./keys-page.js";
 import { DEFAULT_WORKSPACE, listArtifacts, resolveInsideWorkspace } from "./artifacts.js";
 import { artifactsPageHtml } from "./artifacts-page.js";
+import { settingsPageHtml } from "./settings-page.js";
+import {
+  AGENTOS_UNITS,
+  applyAppearance,
+  noctaliaSettingsPath,
+  listSnapshots,
+  probeSettingsDaemon,
+  readSettingsState,
+  readUnitStates,
+  runStateExport,
+  settingsPaths,
+  type AppearanceVariant,
+} from "./settings.js";
+import {
+  DEFAULT_CRED_POLICY_PATH,
+  listCredentials,
+  registerGuide,
+  revokeCredential,
+} from "./credentials.js";
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -54,6 +75,12 @@ const MIME: Record<string, string> = {
  *   /api/artifacts                                         全类型产物索引 JSON（扫描整个工作区，M2）
  *   /api/artifacts/file?path=&mode=view|download           产物在线看/下载（工作区 realpath 沙箱）
  *   /artifacts                                             产物索引页（网页在线看/文档 agent 打开/数据下载）
+ *   /api/settings/appearance   [GET/POST]                   外观状态快照 / 切换（POST 经 settings-daemon CLI）
+ *   /api/settings/system                                    systemd user 单元状态 + snapper 快照列表
+ *   /api/credentials           [GET]                        凭据清单（零明文：只有引用/策略/存在性/最近使用）
+ *   /api/credentials/revoke    [POST]                       吊销（keyring clear + 策略摘除 + 审计）
+ *   /api/settings/migrate/export[POST]                      状态导出（scripts/agentos-state-export.sh）
+ *   /settings                                               AgentOS 系统设置页（外观/凭据/系统/迁移）
  * 只绑 127.0.0.1；所有文件路径经 realpath 越界检查（与 files-mcp 同款沙箱纪律）。
  * agent 的使用方式：files__write_file("canvas/<名字>/index.html", ...) 然后
  * desktop__open("http://127.0.0.1:7788/<名字>/")。
@@ -66,6 +93,17 @@ export function createCanvasServer(
     niriConfigPath?: string;
     colorsPath?: string;
     workspaceDir?: string;
+    /** /settings 面的注入点（缺省走 settingsPaths() 的 env/约定解析） */
+    runner?: CommandRunner;
+    stateFile?: string;
+    settingsSocket?: string;
+    settingsCli?: string;
+    /** noctalia settings.json（外观切换先翻这里的 darkMode 真相） */
+    noctaliaSettings?: string;
+    snapshotScript?: string;
+    exportScript?: string;
+    credPolicyPath?: string;
+    secretToolBin?: string;
   } = {},
 ): http.Server {
   fs.mkdirSync(rootRaw, { recursive: true });
@@ -76,6 +114,17 @@ export function createCanvasServer(
   const colorsPath = opts.colorsPath ?? process.env["AGENTOS_COLORS_JSON"] ?? DEFAULT_COLORS_JSON;
   // 产物索引的扫描范围 = files 扩展的工作区（同一 AGENTOS_WORKSPACE 约定）
   const workspaceDir = opts.workspaceDir ?? process.env["AGENTOS_WORKSPACE"] ?? DEFAULT_WORKSPACE;
+  // /settings 面：读状态 + 起子进程（编排仍在 settings-daemon/scripts，canvas 只是壳）
+  const runner = opts.runner ?? new ShellRunner();
+  const paths = settingsPaths();
+  const stateFile = opts.stateFile ?? paths.stateFile;
+  const settingsSocket = opts.settingsSocket ?? paths.socketPath;
+  const settingsCli = opts.settingsCli ?? paths.settingsCli;
+  const noctaliaSettings = opts.noctaliaSettings ?? noctaliaSettingsPath();
+  const snapshotScript = opts.snapshotScript ?? paths.snapshotScript;
+  const exportScript = opts.exportScript ?? paths.exportScript;
+  const credPolicyPath = opts.credPolicyPath ?? DEFAULT_CRED_POLICY_PATH;
+  const secretToolBin = opts.secretToolBin ?? process.env["SECRET_TOOL_BIN"] ?? "secret-tool";
 
   const safe = (relUrl: string): string | null => {
     // URL 路径以 / 开头，path.resolve 会把它当绝对路径丢弃 root，必须先剥掉
@@ -87,7 +136,31 @@ export function createCanvasServer(
     return real;
   };
 
-  return http.createServer((req, res) => {
+  return http.createServer(async (req, res) => {
+    // ---- 写操作（/settings 面的按钮）：POST 白名单，其余方法照旧 405 ----
+    if (req.method === "POST") {
+      let pathname: string;
+      try {
+        pathname = decodeURIComponent(new URL(req.url ?? "/", "http://localhost").pathname);
+      } catch {
+        res.writeHead(400).end("bad url");
+        return;
+      }
+      if (pathname === "/api/settings/appearance") {
+        handleAppearanceApply(req, res);
+        return;
+      }
+      if (pathname === "/api/credentials/revoke") {
+        handleCredentialRevoke(req, res);
+        return;
+      }
+      if (pathname === "/api/settings/migrate/export") {
+        handleMigrateExport(req, res);
+        return;
+      }
+      res.writeHead(405).end();
+      return;
+    }
     if (req.method !== "GET" && req.method !== "HEAD") {
       res.writeHead(405).end();
       return;
@@ -172,6 +245,44 @@ export function createCanvasServer(
       return;
     }
 
+    // ---- 设置面（AgentOS 自己的系统设置：外观/凭据/系统/迁移） ----
+    if (pathname === "/api/settings/appearance") {
+      const state = readSettingsState(stateFile);
+      const daemon = await probeSettingsDaemon(settingsSocket);
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      res.end(JSON.stringify({ state, stateFile, daemon }));
+      return;
+    }
+    if (pathname === "/api/settings/system") {
+      try {
+        const units = await readUnitStates(runner, AGENTOS_UNITS);
+        const snaps = await listSnapshots(runner, snapshotScript);
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+        res.end(JSON.stringify({ units, snapshots: snaps.snapshots, snapshotsError: snaps.error }));
+      } catch (e) {
+        res.writeHead(500, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+        res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
+      }
+      return;
+    }
+    if (pathname === "/api/credentials") {
+      try {
+        const credentials = await listCredentials({ runner, policyPath: credPolicyPath, auditPath, secretTool: secretToolBin });
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+        // 零明文：这里只有引用/标签/通道/白名单/存在性/最近使用，永远没有值
+        res.end(JSON.stringify({ credentials, policyPath: credPolicyPath, registerGuide: registerGuide("~/AgentOS/scripts/cred-store.sh") }));
+      } catch (e) {
+        res.writeHead(500, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+        res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
+      }
+      return;
+    }
+    if (pathname === "/settings" || pathname === "/settings/") {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+      res.end(settingsPageHtml(loadColors(colorsPath)));
+      return;
+    }
+
     if (pathname === "/" || pathname === "") {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       res.end(indexPage(root));
@@ -244,6 +355,92 @@ export function createCanvasServer(
         return;
       }
       serveFile(real, request, response);
+    }
+
+    /** POST body：小 JSON（上限 64KB——写面只有 variant/ref/withSecrets 几个键） */
+    function readJsonBody(request: http.IncomingMessage, limit = 65536): Promise<Record<string, unknown>> {
+      return new Promise((resolve, reject) => {
+        let body = "";
+        request.on("data", (d: Buffer) => {
+          body += d.toString("utf8");
+          if (body.length > limit) {
+            request.destroy();
+            reject(new Error("body 超限"));
+          }
+        });
+        request.on("end", () => {
+          try {
+            const parsed = body ? (JSON.parse(body) as unknown) : {};
+            if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+              throw new Error("body 必须是 JSON 对象");
+            }
+            resolve(parsed as Record<string, unknown>);
+          } catch (e) {
+            reject(e instanceof Error ? e : new Error("body 不是合法 JSON"));
+          }
+        });
+        request.on("error", reject);
+      });
+    }
+
+    /** 外观切换：canvas 只起 settings-daemon CLI 子进程，编排（五桥+热重载）仍在 daemon */
+    async function handleAppearanceApply(request: http.IncomingMessage, response: http.ServerResponse): Promise<void> {
+      let body: Record<string, unknown>;
+      try {
+        body = await readJsonBody(request);
+      } catch (e) {
+        response.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        response.end(JSON.stringify({ ok: false, detail: e instanceof Error ? e.message : "bad body" }));
+        return;
+      }
+      const variant = body["variant"];
+      if (variant !== "dark" && variant !== "light") {
+        response.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        response.end(JSON.stringify({ ok: false, detail: "variant 须为 dark|light" }));
+        return;
+      }
+      const r = await applyAppearance(runner, settingsCli, stateFile, variant as AppearanceVariant, noctaliaSettings);
+      const daemon = await probeSettingsDaemon(settingsSocket);
+      response.writeHead(r.ok ? 200 : 500, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      response.end(JSON.stringify({ ...r, daemon }));
+    }
+
+    /** 凭据吊销：keyring 条目 + 策略条目 + 审计（顺序见 credentials.ts，全程零明文） */
+    async function handleCredentialRevoke(request: http.IncomingMessage, response: http.ServerResponse): Promise<void> {
+      let body: Record<string, unknown>;
+      try {
+        body = await readJsonBody(request);
+      } catch (e) {
+        response.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        response.end(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : "bad body" }));
+        return;
+      }
+      const ref = body["ref"];
+      if (typeof ref !== "string" || ref === "") {
+        response.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        response.end(JSON.stringify({ ok: false, error: "ref 不能为空" }));
+        return;
+      }
+      const r = await revokeCredential(
+        { runner, policyPath: credPolicyPath, auditPath, secretTool: secretToolBin },
+        ref,
+      );
+      response.writeHead(r.ok ? 200 : 500, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      response.end(JSON.stringify(r));
+    }
+
+    /** 迁移导出：复用 scripts/agentos-state-export.sh（only-if-absent 导入在目标机跑脚本） */
+    async function handleMigrateExport(request: http.IncomingMessage, response: http.ServerResponse): Promise<void> {
+      let body: Record<string, unknown> = {};
+      try {
+        body = await readJsonBody(request);
+      } catch {
+        body = {}; // 空体/空 body 即默认导出
+      }
+      const withSecrets = body["withSecrets"] === true;
+      const r = await runStateExport(runner, exportScript, withSecrets);
+      response.writeHead(r.ok ? 200 : 500, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      response.end(JSON.stringify(r));
     }
   });
 
@@ -342,7 +539,7 @@ function indexPage(root: string): string {
 </style></head><body>
 <h1>AgentOS Canvas</h1>
 <nav>
-  <a href="/artifacts">产物索引（全类型）</a><a href="/keys">键位速查</a><a href="/replay">审计回放</a>
+  <a href="/artifacts">产物索引（全类型）</a><a href="/keys">键位速查</a><a href="/replay">审计回放</a><a href="/settings">AgentOS 设置</a>
 </nav>
 <p style="color:#9aa0aa;font-size:13px">agent 生成的页面会出现在这里。写入方式：canvas/&lt;名字&gt;/index.html</p>
 ${rows.length === 0 ? '<p class="empty">还没有任何 artifact。</p>' : `<table><tr><th>名称</th><th>大小</th><th>更新时间</th></tr>${items}</table>`}

@@ -77,7 +77,7 @@ export function artifactsPageHtml(colorsPath: string = DEFAULT_COLORS_JSON): str
     <h1>AgentOS 产物索引</h1>
     <div class="sub" id="sub">全类型扫描工作区 · 最新在前</div>
   </div>
-  <div class="nav"><span id="ws"></span><a href="/">canvas 首页</a><a href="/keys">键位</a><a href="/replay">回放</a></div>
+  <div class="nav"><span id="ws"></span><a href="/">canvas 首页</a><a href="/keys">键位</a><a href="/replay">回放</a><a href="/settings">设置</a></div>
 </div>
 <main>
   <input id="filter" placeholder="过滤名称/类型/目录…（按 / 聚焦）" autocomplete="off" style="display:none;margin-bottom:14px">

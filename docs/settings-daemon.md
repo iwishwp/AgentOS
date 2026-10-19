@@ -112,9 +112,21 @@ systemctl --user daemon-reload && systemctl --user enable --now agentos-settings
 journalctl --user -u agentos-settings -f           # 观察环保护：应无"自写回声上行"
 ```
 
-## 7. 遗留与后续
+## 7. UI（canvas /settings 页，2026-10-19 接入）
 
-- **canvas 设置页接入**：canvas 三页可改读 state 文件或直接调 D-Bus 属性（当前仍 CSS 变量直读 colors.json，行为不变）。
+AgentOS 自己的系统设置页落在 canvas：`/settings`（外观/凭据/系统/迁移四分区，
+详见 [settings-ui.md](settings-ui.md)）。与本 daemon 的边界：
+
+- **读**：页面后端直接读 `settings-state.json` 状态快照 + socket `Get` 存活探测
+  （与 CLI `ipc` 同一行协议）；
+- **写**：切换按钮 = 翻真相（noctalia settings.json 的 `colorSchemes.darkMode`）+
+  起本包 CLI `apply`（auto）收敛——不直接调 D-Bus `Apply(--dark)` 强制变体，
+  那会被 watcher 按真相立即回滚（实测教训，见 settings-ui.md §2）。
+
+## 8. 遗留与后续
+
+- ~~canvas 设置页接入~~（✅ 2026-10-19，`/settings` 页实测；页面配色仍 CSS 变量直读
+  colors.json，状态/操作走上述通道）。
 - **更多状态源**：壁纸、键位等设置项可挂进同一 daemon（state 模块按源映射，不抢真相）。
 - **Rust 长期方向**：见 ADR-0002——本轮 TS 复用 monorepo 语言栈与 @agentos/proc 基建，
   全项目 Rust 化时此包是第一批迁移对象（watcher/桥/D-Bus（zbus）语义已在测试里钉死）。

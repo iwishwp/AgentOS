@@ -123,7 +123,7 @@ H=40–60°、S≤7%。三张卡片（mako / fuzzel / 浮层）实测底色 #373
 | 键位浮层 / 悬浮球 | QML 直读（兜底内置同值；浮层 spawn 时读色，运行中不热重载） | ✅ 跟随 |
 | ghostty 终端 | ghostty（16 色；新窗口生效 + 已开窗口 wtype 注入热重载） | ✅ 双变体 |
 | **GTK3/4 全应用** | **gtk**（@define-color 覆盖 libadwaita 命名色 35 项 + GTK3 旧色名 22 项；与 settings.ini 共存，仅单行翻转 gtk-application-prefer-dark-theme（gsettings color-scheme 尽力同向）；新窗口生效） | ✅ 双变体 |
-| canvas 三页 | CSS 变量直读 colors.json | ✅ |
+| canvas 四页（/keys /replay /artifacts /settings） | CSS 变量直读 colors.json（/settings 另读 daemon 状态快照做展示，2026-10-19） | ✅ |
 | Qt/Kvantum、编辑器类（VSCode 等） | 未做（Qt 侧可后续走 Kvantum 生成，编辑器主题另议） | ⬜ |
 
 2026-10-18 晚实测（VM 像素采样）：暗档计算器对照组（无 css）#3e3e41 冷调 vs 套色后
@@ -140,7 +140,7 @@ mako/fuzzel/浮层两档均实测同族跟随。
 | fuzzel 启动器 | 每次唤起读配置 | 下次打开 |
 | ghostty 终端 | **已开窗口可热重载**：daemon 的 ghostty 桥自动注入默认键 ctrl+shift+,（wtype，用户级无需 sudo）→ 已开表面即时换色（2026-10-18 用户发现菜单重载有效，实测打通；根因是 ghostty 文件监视器不触发，非 surface 级限制——此前定论已修正） | 即时 |
 | GTK 应用 | 暗/亮跟随 gsettings 即时（libadwaita 内建）；**命名色覆盖（gtk.css）只对新进程生效**，已开应用不重读 | 暗/亮即时、调色板重启 |
-| canvas 三页 | 刷新页面（F5） | 手动 |
+| canvas 四页（含 /settings 设置页） | 刷新页面（F5；/settings 切换按钮应用后自动整页刷新） | 手动/自动 |
 | 键位浮层/悬浮球 | 按键时起进程读色板，重开即新配色 | 下次触发 |
 
 ghostty 浅色可读性（2026-10-18 修复）：16 色极性随变体翻转——浅色档 ANSI 前景全部

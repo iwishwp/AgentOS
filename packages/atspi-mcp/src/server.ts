@@ -112,7 +112,7 @@ export function buildServer(
     {
       title: "按名称连点多个控件",
       description:
-        "按序点击多个已知名称的控件：一次调用完成整串（服务端循环，逐步结果数组返回），适合连续操作已知名称的控件序列——计算器按键、多步表单、向导页等。比逐个 a11y_click 快得多（N 次模型往返变 1 次）。某步找不到名称会停在该步并返回已完成部分。",
+        "按序点击多个已知名称的控件：一次调用完成整串（服务端循环，逐步结果数组返回），适合连续操作已知名称的控件序列——计算器按键、多步表单、向导页等。比逐个 a11y_click 快得多（N 次模型往返变 1 次）。控件名已知（任务给出或界面常识，如计算器的数字/运算符按键名）时可直接调用，不必先 dump_tree 验证；某步找不到名称会停在该步并返回已完成部分。",
       inputSchema: {
         app: appArg,
         names: z
@@ -122,15 +122,22 @@ export function buildServer(
           .describe("按点击顺序排列的控件名称数组（来自 dump_tree 可点清单或界面标签）"),
       },
     },
-    async ({ app, names }: { app: string; names: string[] }) =>
-      text(JSON.stringify(await bridge.clickSequence(app, names), null, 2)),
+    async ({ app, names }: { app: string; names: string[] }) => {
+      const r = (await bridge.clickSequence(app, names)) as { clicked?: number };
+      const hint =
+        (r?.clicked ?? 0) > 0
+          ? "（提示：读结果 a11y_read_texts 与留证 agent_screenshot 相互独立，可同轮并行发出）"
+          : "";
+      return text(JSON.stringify(r, null, 2) + (hint ? `\n${hint}` : ""));
+    },
   );
 
   t(
     "a11y_read_texts",
     {
       title: "读应用内文本",
-      description: "读取应用全部非空文本节点（显示屏/结果/标签值）。读计算结果、表单当前值都用它。",
+      description:
+        "读取应用全部非空文本节点（显示屏/结果/标签值）。读计算结果、表单当前值都用它。与截图类调用相互独立，可在同一轮并行发出。",
       inputSchema: { app: appArg },
     },
     async ({ app }: { app: string }) => text(JSON.stringify(await bridge.texts(app), null, 2)),

@@ -36,7 +36,7 @@ export function buildServer(
     {
       title: "启动 agent 会话（水族馆）",
       description:
-        "在用户桌面上以窗口形式启动一个嵌套 niri 会话——agent 专属的 GUI 环境，所有 GUI 操作都在里面进行，不影响用户焦点。返回它的 IPC socket 与 Wayland display。桌面上会出现一个新窗口，用户可以围观。",
+        "在用户桌面上以窗口形式启动一个嵌套 niri 会话——agent 专属的 GUI 环境，所有 GUI 操作都在里面进行，不影响用户焦点。返回它的 IPC socket 与 Wayland display。桌面上会出现一个新窗口，用户可以围观。启动后要开应用可直接同轮紧跟 agent_open_app（同轮调用按序执行）。",
     },
     async () => {
       const s = await manager.start();
@@ -85,7 +85,11 @@ export function buildServer(
     },
     async ({ command }: { command: string[] }) => {
       await manager.openApp(command);
-      return text(`已在 agent 会话内启动: ${command.join(" ")}`);
+      return text(
+        `已在 agent 会话内启动: ${command.join(" ")}（GUI 应用会随即注册到 a11y 总线，` +
+          `名称通常与应用名相同——可直接用 a11y 扩展按名称操作，如 a11y_click_sequence ` +
+          `连点、a11y_read_texts 读结果；不确定名称时再 a11y_list_apps 查）`,
+      );
     },
   );
 
@@ -103,7 +107,7 @@ export function buildServer(
     {
       title: "截取 agent 会话屏幕",
       description:
-        "对 agent 自己的嵌套会话截图（grim，只截水族馆内部，永远不会截到用户桌面），PNG 保存到 ~/Agent/screenshots/ 并返回路径。视觉理解自身 GUI 操作结果时用。",
+        "对 agent 自己的嵌套会话截图（grim，只截水族馆内部，永远不会截到用户桌面），PNG 保存到 ~/Agent/screenshots/ 并返回路径。视觉理解自身 GUI 操作结果时用。截图与读取类调用（如 a11y_read_texts）相互独立，可在同一轮并行发出。水族馆启动初期画面上可能叠着 niri 的 Important Hotkeys 键位浮层——它是合成器装饰层（非应用内容、不影响 a11y 读写），关闭需要 Esc 注入；截图遇到它时如实说明即可，不必反复重试。",
       inputSchema: {
         name: z.string().optional().describe("文件名标记（可选，仅安全字符）"),
       },

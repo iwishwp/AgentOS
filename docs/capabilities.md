@@ -272,3 +272,56 @@ AT-SPI `doAction` 对 Chromium 系按钮"派发成功但不触发 onclick"（附
 CDP 语义、端口隔离。L3 mouse-click.sh 与 app-cdp 的分工：应用带 CDP 端口 → app-cdp
 （不依赖屏幕坐标、不受窗口遮挡影响）；无端口（xterm/游戏/合成器 UI/未开调试的自拉应用）
 → mouse-click.sh（屏幕绝对坐标）。
+
+## 附录 E：a11y 操作提速——基线 46.5s → 18.9s（2026-10-25 VM 实测，worktree feat/a11y-speed）
+
+### 基线与口径
+
+任务：goose 在水族馆操作 gnome-calculator 计算 1234×56（同一条任务提示词，全程只用
+session+atspi 两扩展，读回 69104 + 截图）。环境：VM 192.168.54.130 / goose 1.54.0 /
+glm-5.3-flash（bigmodel anthropic 兼容通道）/ `goose run --quiet --max-turns 30 -t <任务>`
+（不带 --system，纯工具面改进的可复现口径）。指标：审计时间线首末工具调用间隔。
+
+基线（2026-10-25 02:01，11 次工具调用，**46.53s**）：
+
+| 分段 | 耗时 | 说明 |
+|---|---|---|
+| session_start → open_app | 5.0s | 单次 LLM 往返 |
+| open_app → list_apps → dump_tree | 11.0s | 两跳探索 |
+| dump_tree → 首次点击 | **10.9s** | dump 响应 **179,188 字节**（≈45K token），LLM 消化大上下文 |
+| 8 连击（1/2/3/4/×/5/6/=） | 6.3s | 同轮并行发出、顺序执行，每击 0.9s |
+| read_texts + screenshot | 13.3s | 两轮串行 |
+
+瓶颈结论：工具执行本身 <0.3s，端到端耗时几乎全在 LLM 往返次数与 token 量。
+
+### 四刀与实测效果
+
+| 优化 | 改动 | 单项实测 |
+|---|---|---|
+| ① dump 树供给精简 | `tree` 默认 interactive 模式：可交互元素扁平清单（按钮/输入/链接/可点击+值非空文本，名称+角色）；`roles=` 白名单整体替换默认判定；`mode=full` 保留全树、`compact=1` 去 states/actions 且叶子文本并入父节点 | gnome-calculator dump 响应 179,188 → **4,594 字节**（39 倍缩减）；消化跳 10.9s → ~4-6s |
+| ② 批量点击宏 | 新工具 `a11y_click_sequence(app, names[])`：桥内单次 DFS 建 名→按钮 映射后逐个 doAction，逐步结果数组返回，失败停在该步 | 8 连击 8 跳 → 1 跳，桥执行 0.90s |
+| ③ prime_tree 免空轮询 | Chromium/Electron（document web 命中或名称含 chromium/chrome/electron）才保留 4×0.5s 等树循环；GTK/Qt 单轮触发即走 | 每次 a11y 调用 3.0s → **0.88s**（实测 gnome-calculator 被空轮询拖去 2.07s/次） |
+| ④ 最少往返指引 | goose-system.md §GUI 应用操作提速 + 工具描述/结果内嵌（控件名已知直接 click_sequence、start+open_app 同轮、读文本+截图同轮并行、浮层如实说明不重试） | 三轮全部出现同轮 batching（start+open_app 0.00/0.26s；read+shot 相邻 1s 内） |
+
+### 复测（部署新 dist 后三轮取均值，2026-10-25 03:06-03:10）
+
+| 轮次 | 端到端 | 调用数 | 形态 |
+|---|---|---|---|
+| 1 | 21.88s | 7 | start+open_app 同轮 → interactive dump → click_sequence → read+shot 同轮 |
+| 2 | 21.55s | 7 | start+open_app 同轮 → list+dump → click_sequence → read+shot 同轮 |
+| 3 | **13.16s** | 5 | start+open_app 同轮 → click_sequence 直点（免探索）→ read+shot 同轮 |
+| **均值** | **18.86s** | — | **-59.5%（46.53s → 18.86s），目标 ≤25s 达成** |
+
+三轮均读回 69104 并截图存证；水族馆隔离与主桌面零触碰不变。行为基线（goose-system.md）
+本轮基准未挂载（口径与基线一致）——上述成绩全部来自工具面；生产路径挂上行为基线后，
+"控件名已知直接连点/免探索"会更稳定（第 3 轮形态）。
+
+### 边界与诚实备注
+
+- 按名寻址语义不变（M3 结论保持：名称寻址、树跨连接重建不可用索引）；interactive 清单
+  只影响 dump 的供给面，click/read_texts/set_text 行为未动；
+- 模型侧仍有方差：是否先 dump 验证、是否 list_apps，由模型自决（三轮中两轮验证、一轮直连），
+  端到端 13-22s 波动来自此；
+- 嵌套 niri 的 Important Hotkeys 浮层问题依旧（skip-at-startup 在嵌套模式未生效，f2d8c04
+  遗留）：a11y 路径不受影响，截图可能带浮层；agent_screenshot 描述已注明"如实说明即可，
+  不必反复重试"（未注明前实测一轮被模型拖去 5 分钟试图关闭）。

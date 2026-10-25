@@ -6,6 +6,46 @@
 
 ---
 
+## 2026-10-25（双 seat 键鼠真并行：直连水族馆 display 的虚拟键鼠，借道聚焦退役）
+
+调研命题：agent 能否拥有自己的键鼠、与人**同时**使用（人操作主桌面、agent 同时打字/点按，
+互不干扰）。**结论：可行，且不需要 niri 上游多 seat**。worktree `feat/agent-input`。
+
+- **假设成立（协议层）**：水族馆（嵌套 niri）是完整 compositor，自己的 Wayland display 上
+  同样暴露 `zwp_virtual_keyboard_manager_v1`（wtype 走它）与 `zwlr_virtual_pointer_manager_v1`
+  v2（wlrctl 走它）——主/嵌套两 display 的 `wayland-info` 协议清单一致。客户端连水族馆
+  display 注入，只进嵌套 seat，主 seat 焦点窗口零感知——**结构保证**（注入根本不经过主
+  seat），不是时序保证。
+- **键盘实证**：主 seat 聚焦"人"的终端、水族馆窗口无主 seat 焦点，双路**同时** wtype
+  （wayland-1 / wayland-2）：human 窗口收 `HUMAN-TYPING-ON-MAIN`、水族馆窗口收
+  `AGENT-TYPING-ON-AQ`，零串扰；CJK（"脚本直连水族馆"）逐字符慢输精确。证据回读：
+  两终端各跑 `stty -icanon -echo; cat > 文件` 逐字符落盘。
+- **指针实证**：`dnf install wlrctl`（Fedora 官方仓 75KB）。wlrctl 只有相对位移（协议有
+  motion_absolute 但它不暴露），绝对坐标合成法：`move -9999 -9999` 钳到左上角再相对位移。
+  靶点=水族馆内 PyQt5 全屏窗（mousePressEvent 落盘 globalX/Y）：300,300 / 200,500 /
+  400,200 / 450,260 / 380,220 / 150,150 / 500,400 / 100,600 **全部精确命中**，左/右/中键
+  均送达；并发轮（人打字与 agent 点击同刻）双方结果完整精确。坑两个：负数位移直接写
+  `-9999`（带 `--` 前缀反而报 Extra argument）；两次 wlrctl 间隔 <0.2s 偶发钳位竞态落点
+  偏移一次，0.4s 间隔未再复现。
+- **封装**：`scripts/agent-input.sh`（display|type|key|move|click x y [button]）。display
+  自动发现：扫 `/run/user/$UID/niri.wayland-N.<pid>.sock` 取 cmdline 含 niri 且不含
+  `--session` 的进程（主会话是 `niri --session`）；`AGENTOS_AQ_DISPLAY` 显式覆盖对接
+  session-mcp。已在 VM 端到端实测（display 发现/type 含 CJK/click 250,250 全通，全程主
+  seat 焦点未动）。
+- **顺带发现（重要，待修）**：niri 26.04 拒绝 `hotkey-overlay { show-at-startup false }`
+  （新写法 `skip-at-startup`，niri validate 双向实证）。VM 的 ~/.config/niri/config.kdl
+  含旧写法 → ①嵌套 niri 带 `-c` 启动回落默认配置+报错横幅——**f2d8c04"浮层仍弹"的真根因**；
+  ②journal 证实主会话（今日 10:15 起）同样解析失败回落默认配置在跑。修法一行（改
+  skip-at-startup），未代改——不动在用桌面，留人工确认后改。
+- **纪律执行**：水族馆三轮启停全部 `kill $(cat /tmp/aq-niri.pid)` 精确 pid（含 socket 名
+  内嵌 pid 复核），零模式杀；测试窗口/临时文件全清（wlrctl 留作 agent 键鼠依赖）；
+  证据截图存 `~/Agent/screenshots/2026-10-25-parallel-input-{aquarium,main}.png`。
+- 文档：capabilities.md 附录 E（新）+ 矩阵行 + 升级路径 7；architecture.md §3.3 更新
+  （V3 行改为"输出隔离按需再做"）+ 变更记录；goose-system.md 通道模型改为三级优先
+  （a11y/CDP → agent-input.sh → 主 seat 借道兜底）。
+
+---
+
 ## 2026-10-19（settings-ui：AgentOS 自己的系统设置页 + 凭据管理 + 多机器迁移）
 
 worktree `feat/settings-ui`。三个系统级功能一轮落地：①canvas `/settings` 设置页
@@ -428,6 +468,9 @@ worktree `feat/goose-e2e-skill`（测试 229 基线不动，全绿）。三件�
 6. **M5 点亮亲验**：`agentos-bootc-test` VM 正在 Fusion 运行（192.168.54.131，
    测试机账号密码见本地备忘）——用键盘在 SDDM 登录一次进 niri 会话（这是自动化覆盖不到的
    最后一步），看完可自行关机；产物在 `~/codespace/agentos-images/`。
+7. **VM niri 配置修复**（2026-10-25 发现，一行）：~/.config/niri/config.kdl 的
+   `hotkey-overlay { show-at-startup false }` 改为 `skip-at-startup`——26.04 拒绝旧写法，
+   主会话当前正回落默认配置跑（自定义键位全失效中）。
 
 - **goose 悬浮球**（`55e2faa`）：`qs -c agentos-orb` 常驻右缘——idle/working（审计驱动，
   显示当前工具）/attention（Confirm1 待确认）三态 + 点击面板（最近活动/待确认/直达

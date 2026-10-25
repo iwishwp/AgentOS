@@ -4,7 +4,8 @@
 > L1 无障碍树对 GTK3/GTK4/Qt 应用实测全通（读写点击、无需焦点、不打扰用户），
 > Chromium 树读/文本输入可达（页面点击本走 L2）；X11 分层（GTK3-X11 全通、纯 X11 无树）；
 > Java 未装未测（路径已文档化）；L3 视觉/输入兜底全通——键盘（wtype 用户级为主力、
-> ydotool sudo 兜底）与指针（uinput tablet 协议绝对坐标，2026-10-19 根治，附录 C）。
+> ydotool sudo 兜底）与指针（uinput tablet 协议绝对坐标，2026-10-19 根治，附录 C）；
+> 水族馆专用键鼠真并行（直连嵌套 display 的虚拟键鼠协议，2026-10-25 定案，附录 E）。
 > 每一格的判定都基于真机实测（Fedora aarch64 @ VMware Fusion，niri Wayland 会话），证据出处标注在格内。
 
 图例：✅ 实测可达 · ⚠️ 有条件（条件写明）· ❌ 缺（含补齐路径）
@@ -35,6 +36,7 @@
 | | wtype 键盘（用户级） | ✅ | 2026-10-18 实测（`scripts/kb-inject.sh`）：文本/可打印键（含 space）与修饰组合键（ctrl+shift+comma→ghostty 热重载）可靠；边界：CJK 可能丢首字符、纯控制键（Return/Tab）对 GTK 不触发——控制键需求回落 ydotool |
 | | ydotool 键盘（sudo） | ✅ | M4 实证（polkit 密码直输、Super+K 弹浮层）；绝对按键可靠、控制键路径全；kb-inject.sh 的回落 |
 | | 鼠标指针（uinput tablet，`scripts/mouse-click.sh`） | ✅ | **2026-10-19 根治（附录 C）**：虚拟数字化仪 ABS_X/Y + BTN_TOOL_PEN/BTN_TOUCH，绝对坐标无加速度语义，niri 消费 pen→光标、tip→按下；用户级（/dev/uinput input 组 0660，udev 规则入镜像）。实测：计算器连点读回 77、Noctalia 顶栏 ControlCenter 弹层、zenity entry 右键菜单（BTN_STYLUS）。ydotool mousemove -a（加速度漂移）与 uinput pointer/触摸屏协议（niri 不消费）均已废弃 |
+| | 水族馆专用键鼠真并行（`scripts/agent-input.sh`） | ✅ | **2026-10-25 定案（附录 E）**：wtype/wlrctl 直连水族馆自己的 Wayland display——嵌套 niri 同样暴露 zwp_virtual_keyboard_v1 与 zwlr_virtual_pointer_v1 v2，注入只进嵌套 seat，与人的主 seat 键鼠**结构上**互不干扰。实测：主桌面聚焦别的窗口时双路并发打字各进各窗（human 窗口与水族馆窗口内容零串扰）；指针"角落钳位+相对位移"合成绝对点击，300,300 / 200,500 / 400,200 / 380,220 等全部命中，主 seat 焦点全程未动 |
 
 ## "哪类应用当前打不开/打不好"
 
@@ -53,7 +55,8 @@
 3. **X11 桥验证** ✅ 已定论（附录 B：GTK3-X11 全通 / 纯 X11 无树——后者无桥可装，L3 是终点）；
 4. **JAB**（等真实用例出现再装，路径见附录 B）；
 5. ~~指针精度~~ ✅ 已根治（2026-10-19，附录 C：uinput tablet 协议绝对坐标，mouse-click.sh 用户级）；
-6. ~~桌面 Electron 点击通道~~ ✅ 已统一（2026-10-19，附录 D：app-cdp.mjs + goose 固定 9223）。
+6. ~~桌面 Electron 点击通道~~ ✅ 已统一（2026-10-19，附录 D：app-cdp.mjs + goose 固定 9223）；
+7. ~~真·双 seat 键鼠并行~~ ✅ 已成立（2026-10-25，附录 E：水族馆 display 虚拟键鼠协议直连，不需要 niri 上游多 seat；"借道聚焦三步走"降级为主桌面兜底）。
 
 ## 端到端证据索引（2026-10-18 goose 真会话，GLM glm-5.3-flash）
 
@@ -272,3 +275,83 @@ AT-SPI `doAction` 对 Chromium 系按钮"派发成功但不触发 onclick"（附
 CDP 语义、端口隔离。L3 mouse-click.sh 与 app-cdp 的分工：应用带 CDP 端口 → app-cdp
 （不依赖屏幕坐标、不受窗口遮挡影响）；无端口（xterm/游戏/合成器 UI/未开调试的自拉应用）
 → mouse-click.sh（屏幕绝对坐标）。
+
+## 附录 E：双 seat 键鼠真并行——直连水族馆 display 的虚拟键鼠（2026-10-25 VM 实测）
+
+### 问题与假设
+
+此前输入注入（wtype/uinput tablet）作用于**主 seat**：agent 要输入水族馆必须"聚焦水族馆
+→注入→还原焦点"，打断用户焦点，无法真并行；os/configs/goose-system.md 的旧定案是
+"真·双 seat 需 niri 上游多 seat 支持"。
+
+本次验证的核心假设：**水族馆（嵌套 niri）有自己的 Wayland display 与独立 seat，若它在
+display 上实现虚拟输入协议，客户端直连水族馆 display 即可注入只进嵌套 seat**——与人的
+主 seat 键鼠完全并行，且这是结构保证（注入根本不经过主 seat），不是时序保证。
+
+### 协议验证（niri 26.04）
+
+主 display（wayland-1）与水族馆 display（wayland-2）分别 `wayland-info`，两协议**齐备且
+版本一致**：
+
+```
+zwp_virtual_keyboard_manager_v1  v1   # wtype 走它（键盘）
+zwlr_virtual_pointer_manager_v1  v2   # wlrctl 走它（指针，wlr-protocols 系）
+```
+
+嵌套 niri 是完整 compositor，主会话有的虚拟输入协议它同样暴露——不需要 smithay/niri
+上游任何新能力。指针客户端 wlrctl 在 Fedora 官方仓（`dnf install wlrctl`，75KB）。
+
+### 键盘并行实验
+
+水族馆内开 ghostty 跑 `stty -icanon -echo; cat > /tmp/aq-kb.txt`（每字符即时落盘），
+主 seat 开同款终端写 /tmp/human-kb.txt 并**聚焦它**（水族馆窗口在主 seat 无焦点）。
+双路**同时**注入：
+
+```
+WAYLAND_DISPLAY=wayland-1 wtype "HUMAN-TYPING-ON-MAIN"   # 模拟人打字（主 seat 焦点窗口）
+WAYLAND_DISPLAY=wayland-2 wtype "AGENT-TYPING-ON-AQ"     # agent 打字（水族馆 display）
+```
+
+结果：human 窗口精确收到 `HUMAN-TYPING-ON-MAIN`，水族馆窗口精确收到 `AGENT-TYPING-ON-AQ`，
+零串扰、零丢字；主 seat 焦点状态全程未变。CJK（"脚本直连水族馆"）经逐字符慢输同样精确。
+
+### 指针并行实验
+
+水族馆内跑 PyQt5 全屏靶点（mousePressEvent 把 globalX/globalY 落盘）。wlrctl 只发**相对
+位移**（协议本身有 motion_absolute，wlrctl 未暴露），绝对坐标用合成法：
+
+```
+wlrctl pointer move -9999 -9999   # 钳到左上角（屏幕边缘 clamp）
+wlrctl pointer move 300 300       # 位移量即绝对坐标
+wlrctl pointer click left         # 按钮名 left|right|middle
+```
+
+实测（主 seat 焦点始终在 human 窗口）：300,300 / 200,500 / 400,200 / 450,260 / 380,220 /
+150,150 / 500,400 / 100,600 全部按命令精确落点，左/右/中三键均送达；并发轮（人打字与
+agent 点击同一时刻）human 文件完整、水族馆落点精确。已知边界：连续两次 wlrctl 间隔
+<0.2s 偶发一次落点偏移（钳位竞态），间隔 0.4s 未再复现——脚本已固化 0.4s。
+
+### 封装：scripts/agent-input.sh
+
+`display|type|key|move|click x y [left|right|middle]`。display 自动发现：扫
+`/run/user/$UID/niri.wayland-N.<pid>.sock`，取 cmdline 含 niri 且**不含 --session** 的进程
+（主会话是 `niri --session`），多候选取最新；`AGENTOS_AQ_DISPLAY` 可显式覆盖（对接
+session-mcp 返回的 waylandDisplay）。CJK 自动逐字符慢输（防 wtype 丢首字符老坑）。
+
+### 残留边界与跟进项
+
+- wlrctl 不暴露 motion_absolute：绝对点击靠"角落钳位+相对位移"合成，已实测可靠；
+  需要原生绝对语义时可写 pywayland 小客户端（python3-pywayland 在 Fedora 仓）；
+- wtype 纯控制键（Return/Tab）在 GTK 控件不触发行为的老边界不变——水族馆里
+  "输入+回车"优先 a11y 激活或改点按钮；
+- **顺带发现（重要）**：niri 26.04 拒绝 `hotkey-overlay { show-at-startup false }`
+  （改成了 `skip-at-startup`，niri validate 双向实证）。VM 的 ~/.config/niri/config.kdl
+  含旧写法 → 嵌套 niri 带 `-c` 启动回落默认配置+报错横幅（f2d8c04"浮层仍弹"的真根因）；
+  journal 证实**主会话**（今日 10:15 起）也在解析失败回落默认配置运行。修法一行：
+  该块改为 `hotkey-overlay { skip-at-startup }`。未代改（不动在用桌面，留人工确认）。
+
+### 证据
+
+- 双路并发文件级回读（本节命令与输出即审计记录）；
+- 截图：VM `~/Agent/screenshots/2026-10-25-parallel-input-{aquarium,main}.png`
+  （水族馆侧终端 -echo 无回显，内容以文件回读为准）。

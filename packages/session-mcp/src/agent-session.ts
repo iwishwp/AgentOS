@@ -56,7 +56,12 @@ export class AgentSessionManager {
         if (!wayland) {
           throw new SessionError("没有 WAYLAND_DISPLAY——session-mcp 必须在图形会话环境内运行");
         }
-        const child = spawn("niri", [], {
+        // -c 显式指定主配置：嵌套模式下调用的配置解析行为不可靠（2026-10-25 实测
+        // show-at-startup=false 未生效仍弹浮层），显式路径消除歧义
+        const args: string[] = [];
+        const cfg = path.join(process.env["HOME"] ?? "", ".config/niri/config.kdl");
+        if (fs.existsSync(cfg)) args.push("-c", cfg);
+        const child = spawn("niri", args, {
           stdio: "ignore",
           detached: true,
           env: { ...process.env, WAYLAND_DISPLAY: wayland },

@@ -30,10 +30,10 @@ flowchart TB
         cb["credential broker（凭据代理）<br/>docs/security/credentials.md"]
     end
     subgraph AS["agent seat：嵌套 niri 会话（V1，跑在用户桌面一个窗口里）"]
-        v["LibreOffice / 浏览器 / 仅 GUI 的长尾应用<br/>grim 截屏（只截自己的输出）<br/>ydotool 输入（只进自己的 seat）"]
+        v["LibreOffice / 浏览器 / 仅 GUI 的长尾应用<br/>grim 截屏（只截自己的输出）<br/>agent-input.sh 键鼠（直连自己的 display，只进自己的 seat）"]
     end
     USER -- "niri IPC / dbus / portals" --> AG
-    AG -- "独立输出 + uinput（独立 seat）" --> AS
+    AG -- "独立输出 + 虚拟键鼠协议（水族馆 display）" --> AS
 ```
 
 ## 3. 人机并发模型（核心设计决策）
@@ -56,15 +56,21 @@ flowchart TB
 |---|---|---|
 | V1（M3） | **嵌套 niri**：agent 会话跑在用户桌面一个窗口里（“水族馆”） | niri 官方支持嵌套运行；输入天然隔离在窗口内；用户可围观 agent 操作；实现成本最低 |
 | V2 | **headless 虚拟输出 + 串流**（wayvnc/Sunshine） | agent 会话离屏渲染，不占桌面；需要时串流观看 |
-| V3 | **真·多 seat**（第二物理屏 + udev seat 标签的 uinput 设备） | 物理级隔离，按需再做 |
+| V3 | **真·多 seat**（第二物理屏 + udev seat 标签的 uinput 设备） | 输入并行已在 V1 达成（§3.3）；V3 剩余价值只是**输出**物理隔离，按需再做 |
 
 关键收益：agent 截图永远只截**自己的输出**，不存在“用户屏幕被发给云端模型”的隐私问题。
 
-### 3.3 输入注入选型
+### 3.3 输入注入选型（2026-10-25 更新：真并行成立）
 
-- niri/Hyprland 生态现实方案：**ydotool**（写 `/dev/uinput`，守护进程 + udev 授权）；
+- **agent 会话内输入（真并行，首选注入路径）**：水族馆是完整 compositor，自己的 display
+  上同样暴露 `zwp_virtual_keyboard_v1` 与 `zwlr_virtual_pointer_v1`——wtype / wlrctl
+  **直连水族馆 display**，注入只进嵌套 seat，与人的主 seat 键鼠互不干扰（结构保证）。
+  封装 `scripts/agent-input.sh`。实测与证据见 [capabilities.md](capabilities.md) 附录 E；
+- **主 seat 输入兜底**（agent 必须操作用户桌面窗口时）：uinput tablet 绝对坐标
+  （`scripts/mouse-click.sh`，2026-10-19 根治）与 wtype（`scripts/kb-inject.sh`）——作用于
+  主 seat，需“聚焦目标→注入→还原”三步走；
 - GNOME 的 libei/portal 路径更合规但生态不覆盖我们；
-- 进阶：自研受控 uinput 守护，将虚拟设备 udev 打标到 agent seat，实现物理隔离。
+- 进阶（V3）：自研受控 uinput 守护，将虚拟设备 udev 打标到第二物理 seat，实现输出级隔离。
 
 ## 4. 工具面：computer use 是兜底，不是主通道
 
@@ -150,3 +156,5 @@ AgentOS/
 ## 变更记录
 
 - 2026-10-12 v0.1 初稿：定底座（CachyOS+niri+goose）、并发模型（独立会话）、分层工具面、呈现层与安全总纲。
+- 2026-10-25 §3.3 更新：水族馆 display 虚拟键鼠协议实测——agent 键鼠真并行成立
+  （不需要上游多 seat），“借道聚焦”降级为主 seat 兜底。证据见 capabilities.md 附录 E。

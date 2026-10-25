@@ -32,6 +32,67 @@ describe("命令构造", () => {
     expect(runner.lastArgs()).toEqual([script, "tree", "gnome-calculator", "16"]);
   });
 
+  it("tree 默认 interactive：不附加任何模式参数（桥端默认）", async () => {
+    runner.on([script, "tree"], { stdout: '{"mode":"interactive"}' });
+    await new AtspiBridge(runner, "/fake/python3", script).tree("app", 8);
+    expect(runner.lastArgs()).toEqual([script, "tree", "app", "8"]);
+  });
+
+  it("tree interactive_only=false 时传 mode=full", async () => {
+    runner.on([script, "tree"], { stdout: "{}" });
+    await new AtspiBridge(runner, "/fake/python3", script).tree("app", 16, {
+      interactiveOnly: false,
+    });
+    expect(runner.lastArgs()).toEqual([script, "tree", "app", "16", "mode=full"]);
+  });
+
+  it("tree roles 白名单与 compact 透传为 k=v", async () => {
+    runner.on([script, "tree"], { stdout: "{}" });
+    await new AtspiBridge(runner, "/fake/python3", script).tree("app", 16, {
+      interactiveOnly: false,
+      compact: true,
+      roles: ["button", "push button"],
+    });
+    expect(runner.lastArgs()).toEqual([
+      script,
+      "tree",
+      "app",
+      "16",
+      "mode=full",
+      "compact=1",
+      "roles=button,push button",
+    ]);
+  });
+
+  it("clickSequence 把按钮名按序展开为 clickseq 参数", async () => {
+    runner.on([script, "clickseq"], { stdout: '{"done":true}' });
+    await new AtspiBridge(runner, "/fake/python3", script).clickSequence(
+      "gnome-calculator",
+      ["1", "2", "3", "4", "×", "5", "6", "="],
+    );
+    expect(runner.lastArgs()).toEqual([
+      script,
+      "clickseq",
+      "gnome-calculator",
+      "1",
+      "2",
+      "3",
+      "4",
+      "×",
+      "5",
+      "6",
+      "=",
+    ]);
+  });
+
+  it("clickSequence 空列表与超长列表被拒", async () => {
+    const b = new AtspiBridge(runner, "/fake/python3", script);
+    await expect(b.clickSequence("app", [])).rejects.toThrow(AtspiError);
+    await expect(b.clickSequence("app", Array(33).fill("x"))).rejects.toThrow(AtspiError);
+    await expect(b.clickSequence("app", ["ok", "  "])).rejects.toThrow(AtspiError);
+    expect(runner.calls).toHaveLength(0);
+  });
+
   it("doAction 的路径序列化成逗号串", async () => {
     runner.on([script, "action"], { stdout: '{"done":true}' });
     await new AtspiBridge(runner, "/fake/python3", script).doAction(

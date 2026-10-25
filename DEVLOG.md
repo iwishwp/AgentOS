@@ -43,7 +43,41 @@
 - 文档：capabilities.md 附录 E（新）+ 矩阵行 + 升级路径 7；architecture.md §3.3 更新
   （V3 行改为"输出隔离按需再做"）+ 变更记录；goose-system.md 通道模型改为三级优先
   （a11y/CDP → agent-input.sh → 主 seat 借道兜底）。
+## 2026-10-25（a11y 提速：计算器基准 46.5s → 18.9s，四刀收口）
 
+worktree `feat/a11y-speed`。目标可量化：goose 在水族馆操作 gnome-calculator 算
+1234×56 的端到端耗时（审计首末调用间隔）从 46.53s 压到 ≤25s。**结果：三轮均值
+18.86s（-59.5%），达成**（21.88 / 21.55 / 13.16s，全部读回 69104 + 截图存证；
+VM 192.168.54.130 / goose 1.54.0 / glm-5.3-flash / 同任务同命令，不带 --system
+的纯工具面口径）。四刀与实测：①dump 默认 interactive 扁平清单（响应 179,188 →
+4,594 字节，39 倍；`roles=` 白名单、`mode=full`+`compact=1` 保结构分析）；
+②`a11y_click_sequence` 批量点击（8 击 8 跳变 1 跳，桥内单 DFS 建名→节点映射，
+执行 0.90s）；③`prime_tree` 免空轮询（GTK/Qt 单轮触发即走，每次 a11y 调用
+3.0s → 0.88s）；④最少往返指引（goose-system.md 新段 + 工具描述/结果内嵌：
+已知控件名直连、start+open_app 同轮、读文本+截图同轮并行）。
+
+- **瓶颈定位靠数据不靠感觉**：基线审计里 dump_tree 响应 179,188 字节 ≈45K token、
+  单跳消化 10.9s；8 连击同轮发出顺序执行（GLM 一轮多工具调用实证可用）每击 0.9s
+  ——先以为是模型往返，第二轮组件计时才发现 prime_tree 对 GTK 空转 4×0.5s 等树
+  循环才是工具侧大头（每次调用白拖 2.07s）。教训：桥脚本里"对所有应用普适"的
+  等待逻辑，代价是每个非目标应用都付账。
+- **Chromium 语义保住**：懒建树等待只对 Web 运行时保留（document web 命中或名称
+  含 chromium/chrome/electron）；GTK/Qt 单轮 GetAttributes/GetRelationSet 触发
+  即走（对它们触发本就无副作用）。未知 Electron 应用首次 dump 可能 partial、
+  第二次全——SKILL 已有"首次 dump 多等"纪律，行为面不变。
+- **指引放决定点**：并行提示写在 click_sequence 的返回结果里（拿到点击结果正是
+  想读文本+截图的时刻），比埋在系统提示词里生效得多——三轮全部出现同轮 batching
+  （start+open_app 相邻 0.26s、read+shot 相邻 ~1s）。
+- **浮层的诚实处置**：嵌套 niri 的 Important Hotkeys 浮层（skip-at-startup 嵌套
+  不生效，f2d8c04 遗留）不挡 a11y 只挡截图；没写说明前模型为关它拖了 5 分钟
+  （仅 session+atspi 约束下 Esc 注入不可达），在 agent_screenshot 描述里写明
+  "合成器装饰、如实说明即可"后不再纠缠。根因另立项，不在本轮。
+- **基准纪律**：三轮之间用 socket 里的 pid 精确 kill 水族馆（绝不模式杀）；每轮
+  从审计行偏移切自己那段时间线；试点轮忘记清场导致双计算器实例污染一轮（同名
+  寻址解析到先注册者），重测——脏环境的数据宁可扔掉。
+- 测试：全仓 308/308（基线 299 + atspi-mcp 9：tree 参数构造/clickseq 展开与校验/
+  MCP 面透传与 schema 拒绝）。文档：capabilities.md 附录 E（基线分段表、四刀实测、
+  三轮对比、边界备注）、goose-system.md §GUI 应用操作提速、SKILL.md a11y 表同步。
 ---
 
 ## 2026-10-19（settings-ui：AgentOS 自己的系统设置页 + 凭据管理 + 多机器迁移）

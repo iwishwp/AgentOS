@@ -27,9 +27,18 @@ export class AtspiBridge {
     return this.call(["apps"]);
   }
 
-  async tree(app: string, depth: number): Promise<unknown> {
+  async tree(
+    app: string,
+    depth: number,
+    opts: { interactiveOnly?: boolean; roles?: string[]; compact?: boolean } = {},
+  ): Promise<unknown> {
     assertAppName(app);
-    return this.call(["tree", app, String(depth)]);
+    const args = ["tree", app, String(depth)];
+    // 默认走桥的 interactive 模式（扁平可点清单）；只有显式 false 才写 mode=full
+    if (opts.interactiveOnly === false) args.push("mode=full");
+    if (opts.compact) args.push("compact=1");
+    if (opts.roles && opts.roles.length > 0) args.push(`roles=${opts.roles.join(",")}`);
+    return this.call(args);
   }
 
   /** 按名称点击按钮（推荐：树结构跨进程不稳定，名称寻址稳定） */
@@ -37,6 +46,18 @@ export class AtspiBridge {
     assertAppName(app);
     if (!buttonName.trim()) throw new AtspiError("按钮名不能为空");
     return this.call(["click", app, buttonName]);
+  }
+
+  /** 按序批量点击多个已知名称的按钮：一次桥调用完成整串，逐步结果数组返回 */
+  async clickSequence(app: string, names: string[]): Promise<unknown> {
+    assertAppName(app);
+    if (names.length === 0 || names.length > 32) {
+      throw new AtspiError("names 数量须在 1 到 32 之间");
+    }
+    for (const n of names) {
+      if (!n.trim()) throw new AtspiError("控件名不能为空");
+    }
+    return this.call(["clickseq", app, ...names]);
   }
 
   /** 读取应用内全部非空文本节点（读显示屏/结果的主力） */

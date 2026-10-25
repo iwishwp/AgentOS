@@ -56,10 +56,10 @@ export class AgentSessionManager {
         if (!wayland) {
           throw new SessionError("没有 WAYLAND_DISPLAY——session-mcp 必须在图形会话环境内运行");
         }
-        // -c 显式指定主配置：嵌套模式下调用的配置解析行为不可靠（2026-10-25 实测
-        // show-at-startup=false 未生效仍弹浮层），显式路径消除歧义
+        // -c 指向水族馆专用最小配置（os/configs/niri/aquarium.kdl 部署而来）：
+        // 馆内零自启（曾误指主配置导致 mako/noctalia/orb/goose 全套在馆内重复启动）
         const args: string[] = [];
-        const cfg = path.join(process.env["HOME"] ?? "", ".config/niri/config.kdl");
+        const cfg = path.join(process.env["HOME"] ?? "", ".config/niri/aquarium.kdl");
         if (fs.existsSync(cfg)) args.push("-c", cfg);
         const child = spawn("niri", args, {
           stdio: "ignore",

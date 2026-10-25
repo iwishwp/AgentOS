@@ -45,6 +45,14 @@ TEXT_ROLES = {
     "label", "static", "heading", "paragraph",
 }
 
+# 已知 Web 运行时（懒建树需要等待构建完成）；GTK/Qt 无懒建树，触发即走
+WEB_RUNTIME_HINTS = ("chromium", "chrome", "electron")
+
+
+def looks_like_web_runtime(app_name):
+    n = (app_name or "").lower()
+    return any(h in n for h in WEB_RUNTIME_HINTS)
+
 
 def find_app(name):
     desktop = pyatspi.Registry.getDesktop(0)
@@ -422,9 +430,11 @@ def cmd_settext(app, match, new_text):
 
 def prime_tree(app):
     """Chromium/Electron 懒建树触发：AT 对已注册对象调 GetAttributes/GetRelationSet
-    后 Chromium 才开始构建页面内容树（Orca 走的同一条路；GTK/Qt 对此无副作用）。
-    树是异步构建的——触发后短暂轮询，直到出现 document web（页面根）或轮询耗尽
-    （实测 2026-10-18：触发前只有窗口装饰按钮，触发后 h1/button/input 全部出现）。"""
+    后 Chromium 才开始构建页面内容树（Orca 走的同一条路）。
+    树是异步构建的——对已知 Web 运行时触发后轮询等待；GTK/Qt 没有懒建树行为，
+    只做一轮触发即返回（实测 2026-10-25：gnome-calculator 每次调用被 4×0.5s
+    空轮询拖去 2.07s，a11y 调用本身 <0.3s——提速基准里这是最大单项浪费）。
+    （实测 2026-10-18：触发前只有窗口装饰按钮，触发后 h1/button/input 全部出现。）"""
     def has_page_root():
         for node in dfs(app, max_depth=6):
             try:
@@ -434,20 +444,30 @@ def prime_tree(app):
                 continue
         return False
 
-    for _ in range(4):
-        try:
-            if app.childCount == 0:
-                return
-        except Exception:
-            return
-        if has_page_root():
-            return
+    def touch():
         for node in dfs(app, max_depth=4):
             try:
                 node.getAttributes()
                 node.getRelationSet()
             except Exception:
                 continue
+
+    try:
+        if app.childCount == 0:
+            return
+    except Exception:
+        return
+    if has_page_root():
+        return
+    touch()
+    # 已知 Web 运行时才等树建完；其余（GTK/Qt/未知）触发即走——
+    # 首次 dump 可能 partial 属正常，下一次就全（SKILL 已记）
+    if has_page_root() or not looks_like_web_runtime(name_of(app)):
+        return
+    for _ in range(4):
+        if has_page_root():
+            return
+        touch()
         time.sleep(0.5)
 
 

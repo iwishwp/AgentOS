@@ -6,7 +6,19 @@
 
 ---
 
-## 2026-10-25（双 seat 键鼠真并行：直连水族馆 display 的虚拟键鼠，借道聚焦退役）
+## 2026-10-26
+
+- **行为基线接线断裂修复**：goose-system.md（水族馆默认/工具优先级/通知契约）从未注入
+  goose 会话（旧副本躺在 AgentOS-m4 目录无人引用，会话库 0 提及）——用户实测 agent 直
+  接主会话开计算器即此因。修复：部署 ~/.config/goose/goose-system.md + goose.env 增
+  GOOSE_SYSTEM 注入（desktop 与 CLI 同源生效）+ AGENTOS_BROWSER_HEADED=1（浏览器可
+  围观）。验证：同句"打开计算器算 3×4"→审计全程 session/a11y 馆内工具，回复自述
+  "未打扰您的桌面" ✓。
+- **主会话误杀第二起（同一类错误，零容忍）**：pid 提取 `grep -oE "[0-9]+"` 会从
+  wayland-**1** 里抓出 "1"——主 pid 恒错→杀全。正确式：
+  `sed -E 's/.*wayland-[0-9]+\.([0-9]+)\.sock/\1/'`。铁律升级：**杀 niri 前必须
+  echo 出 socket 名与提取 pid 并肉眼核对**，仅凭脚本判断禁止执行 kill。
+（双 seat 键鼠真并行：直连水族馆 display 的虚拟键鼠，借道聚焦退役）
 
 调研命题：agent 能否拥有自己的键鼠、与人**同时**使用（人操作主桌面、agent 同时打字/点按，
 互不干扰）。**结论：可行，且不需要 niri 上游多 seat**。worktree `feat/agent-input`。

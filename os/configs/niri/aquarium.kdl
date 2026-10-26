@@ -15,9 +15,23 @@ hotkey-overlay {
     skip-at-startup
 }
 
+// 馆内应用默认全屏打开——单 app 即整屏（2026-10-26）；agent 需要对照多窗时用形态键收小
+window-rule {
+    open-fullscreen true
+}
+
+// 兜底：单列铺满工作区宽（即使个别应用拒 fullscreen hint 也视觉全屏）
+layout {
+    default-column-width { proportion 1.0; }
+}
+
 binds {
     // 接管围观时的最低键位：关掉馆内焦点窗口 / 整馆退出（退出也可用主会话关窗）
     Mod+Q { close-window; }
+    Mod+F { fullscreen-window; }
+    Mod+C { center-column; }
+    Mod+Shift+Left { set-column-width "50%"; }
+    Mod+Shift+Right { center-column; }
     Mod+Shift+E { quit; }
     Mod+Return { spawn "ghostty"; }
 }

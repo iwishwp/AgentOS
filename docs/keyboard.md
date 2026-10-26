@@ -146,3 +146,11 @@ Fusion 里 ⌘ 会被当作 Super 发进虚拟机，但 **macOS 自己先截获�
 - 2026-10-17 Super+K 切到 canvas 键位速查页（/keys，packages/canvas keys 模块）：
   整页滚动 + 吸顶分组 + 输入过滤 + 莫兰迪系统配色，数据实时解析 niri 配置；
   Mod+Shift+/ 保留内置 overlay 作兜底。VM 实测：真实按键弹窗、滚动、过滤全通过。
+
+### 四态窗口形态（2026-10-26）
+
+主会话与水族馆一致：**Super+F** 全屏切换；**Super+C** 居中；**Super+Shift+Left**
+半屏宽（滚动模型单列天然靠左）；**Super+Shift+Right** 半屏宽居中。水族馆内为
+Mod+ 前缀同款。局限如实：niri 滚动布局无"贴右半屏"原语（列总是从视图左缘排布），
+Right 键给的是居中半屏；确需贴右可用鼠标拖动浮动窗。水族馆默认单应用铺满
+（layout proportion 1.0 + open-fullscreen 规则）。

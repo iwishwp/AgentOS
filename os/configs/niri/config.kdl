@@ -93,6 +93,13 @@ binds {
     // 动作取 niri 的真全屏 fullscreen-window（替换 niri 默认在此键上的 maximize-column）
     Super+F { fullscreen-window; }
 
+    // 四态窗口形态（2026-10-26）：全屏=Super+F；居中小窗=Super+C；
+    // 半屏=Super+Shift+Left/Right（滚动模型单列天然靠左；Right 为 50% 宽居中，
+    // niri 无贴右原语，见 docs/keyboard.md）
+    Super+C { center-column; }
+    Super+Shift+Left { set-column-width "50%"; }
+    Super+Shift+Right { center-column; }
+
     // 平铺全屏：Omarchy 的 Super+Ctrl+F"Tiled full screen"，
     // 对应 niri 的 maximize-column（撑满但保留边距/边框的"全屏"）
     Super+Ctrl+F { maximize-column; }

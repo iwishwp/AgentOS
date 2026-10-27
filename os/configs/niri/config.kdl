@@ -46,11 +46,11 @@ spawn-at-startup "/home/demon/AgentOS/scripts/launch-goose-desktop.sh"
 // 逐应用开窗形态（2026-10-27 用户定案）：默认居中半宽，"沉浸类"应用开窗即最大化
 // （niri 无"单窗全屏、第二窗自动对半"的条件原语，改为逐应用配置）。要加应用照抄一行。
 window-rule {
-    match-app-id "chromium-browser"
+    match app-id="chromium-browser"
     open-maximized true
 }
 window-rule {
-    match-app-id "org.mozilla.firefox"
+    match app-id="org.mozilla.firefox"
     open-maximized true
 }
 

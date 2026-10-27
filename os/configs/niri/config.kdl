@@ -42,6 +42,22 @@ spawn-at-startup "qs" "-c" "agentos-orb"
 // RPM 包（Goose-1.55.0-1.arm64）需 Mac 中转安装，见同文。路径按部署机用户名调整
 spawn-at-startup "/home/demon/AgentOS/scripts/launch-goose-desktop.sh"
 
+// ---------------------------------------------------------------------------
+// 逐应用开窗形态（2026-10-27 用户定案）：默认居中半宽，"沉浸类"应用开窗即最大化
+// （niri 无"单窗全屏、第二窗自动对半"的条件原语，改为逐应用配置）。要加应用照抄一行。
+window-rule {
+    match-app-id "com.mitchellh.ghostty"
+    open-maximized true
+}
+window-rule {
+    match-app-id "chromium-browser"
+    open-maximized true
+}
+window-rule {
+    match-app-id "org.mozilla.firefox"
+    open-maximized true
+}
+
 // 美学配置（布局/动画/色板），见 os/configs/theming/niri/aesthetics.kdl
 // include 语义为文档拼接：layout 与 animations 段只在那个文件里定义，勿在此重复
 include "./aesthetics.kdl"
@@ -92,6 +108,7 @@ binds {
     // 全屏：Omarchy 的 Super+F 键位原样采纳。
     // 动作取 niri 的真全屏 fullscreen-window（替换 niri 默认在此键上的 maximize-column）
     Super+F { fullscreen-window; }
+    Super+Shift+F { fullscreen-window; }  // 备用：若 Super+F 被 Fusion 宿主快捷键拦截
 
     // 四态窗口形态（2026-10-26）：全屏=Super+F；居中小窗=Super+C；
     // 半屏=Super+Shift+Left/Right（滚动模型单列天然靠左；Right 为 50% 宽居中，

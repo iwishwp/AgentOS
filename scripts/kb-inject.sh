@@ -65,3 +65,9 @@ case "$MODE" in
   key) YD key $ARG ;;
   *) die "未知模式 $MODE" ;;
 esac
+
+# 2026-10-27 实测教训：注入和弦后若释放事件丢失，niri 的 xkb 会留幻影修饰键，
+# 后续所有组合键解析错乱（表现为"键位全死"）。每次注入后强制释放全修饰键自愈。
+release_all_modifiers() {
+  $INJECT key 125:0 126:0 61:0 62:0 2>/dev/null || true
+}

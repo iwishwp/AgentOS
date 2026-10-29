@@ -6,9 +6,14 @@
   atspi_bridge.py tree <app名称> [最大深度|k=v ...]
       可选 k=v：depth=N（默认 16）、mode=interactive|full（默认 interactive：
       只输出可交互元素扁平清单）、roles=逗号分隔角色白名单（替代默认可交互
-      判定）、compact=1（full 模式精简树：去 states/actions、叶子文本并入父节点）
+      判定）、compact=1（full 模式精简树：去 states/actions、叶子文本并入父
+      节点）、geom=1（interactive 清单每元素附 geom=[x,y,w,h] 屏幕坐标，
+      供指针点击类组合工具定位）
   atspi_bridge.py clickseq <app名称> <按钮名1> <按钮名2> ...
       按序点击多个已知名称的按钮，单进程一次 DFS 建名→节点映射后逐个 doAction
+  atspi_bridge.py locate <app名称> <名称子串> [roles=逗号白名单]
+      按名称子串找元素并输出其屏幕几何（geom 与中心点 center）——
+      scripts/app-click-precise.sh 用它把 a11y 定位接到 mouse-click.sh 绝对点击
   atspi_bridge.py action <app名称> <逗号索引路径> <动作序号>
   atspi_bridge.py text   <app名称> <逗号索引路径> <新文本>
 
@@ -183,6 +188,17 @@ def content_of(acc):
     return n if n and n.strip() else None
 
 
+def extent_of(acc):
+    """元素在屏幕上的几何 (x, y, w, h)；Component 接口不可用或异常返回 None。
+    DESKTOP_COORDS（屏幕坐标）与 mouse-click.sh 的 niri 逻辑坐标同系。
+    注意 pyatspi 绑定方法名是 getExtents（复数，返回 BoundingBox 四元组）——
+    atspi 原生 C API 才叫 get_extent（实测 2026-10-29：getExtent 不存在）。"""
+    try:
+        return acc.queryComponent().getExtents(pyatspi.DESKTOP_COORDS)
+    except Exception:
+        return None
+
+
 def has_action(acc):
     try:
         return acc.queryAction().nActions > 0
@@ -190,10 +206,12 @@ def has_action(acc):
         return False
 
 
-def cmd_tree_interactive(app, max_depth, roles_whitelist):
+def cmd_tree_interactive(app, max_depth, roles_whitelist, include_geom=False):
     """interactive 模式：DFS 扁平清单，只收可交互元素与值非空文本。
     定位：让调用方一跳拿到"可点清单"（名称+角色），替代"倒全树→LLM 找按钮名"——
-    实测 gnome-calculator 全树 179KB，agent 消化该上下文单跳 10.9s。"""
+    实测 gnome-calculator 全树 179KB，agent 消化该上下文单跳 10.9s。
+    include_geom 时每元素附 geom=[x,y,w,h]（屏幕坐标，Component 接口）——
+    指针点击类组合工具（app-click-precise.sh）的定位来源。"""
     wanted = set(roles_whitelist) if roles_whitelist else INTERACTIVE_ROLES
     elements = []
     truncated = False
@@ -214,6 +232,9 @@ def cmd_tree_interactive(app, max_depth, roles_whitelist):
         v = value_of(node)
         if v is not None and str(v) != "":
             entry["value"] = str(v)
+        if include_geom:
+            ext = extent_of(node)
+            entry["geom"] = list(ext) if ext else None
         elements.append(entry)
         if len(elements) >= MAX_NODES:
             truncated = True
@@ -278,7 +299,8 @@ def is_pure_text_leaf(acc):
 
 def parse_tree_opts(raw):
     """解析 tree 子命令的可选参数：位置 depth（兼容旧格式）+ k=v 键值。"""
-    opts = {"depth": 16, "mode": "interactive", "compact": False, "roles": None}
+    opts = {"depth": 16, "mode": "interactive", "compact": False, "roles": None,
+            "geom": False}
     for tok in raw:
         if "=" not in tok:
             opts["depth"] = int(tok)
@@ -290,14 +312,41 @@ def parse_tree_opts(raw):
             opts["mode"] = val
         elif key == "compact":
             opts["compact"] = val.lower() in ("1", "true", "yes")
+        elif key == "geom":
+            opts["geom"] = val.lower() in ("1", "true", "yes")
         elif key == "roles":
             roles = [r.strip() for r in val.split(",") if r.strip()]
             opts["roles"] = roles or None
         else:
-            raise SystemExit(f"未知 tree 参数 {tok!r}（可用 depth/mode/compact/roles）")
+            raise SystemExit(f"未知 tree 参数 {tok!r}（可用 depth/mode/compact/geom/roles）")
     if opts["mode"] not in ("interactive", "full"):
         raise SystemExit(f"未知 mode {opts['mode']!r}（interactive|full）")
     return opts
+
+
+def cmd_locate(app, match, roles_whitelist):
+    """按名称子串定位元素并输出屏幕几何与中心点——app-click-precise.sh 的定位后端。
+    名称可能跨树重建变化，故与 click 同样取"首个命中"；输出全部命中里第一个
+    有非零几何的元素（隐藏元素 geom 全零/None，跳过）。"""
+    wanted = set(roles_whitelist) if roles_whitelist else None
+    for node in dfs(app):
+        try:
+            role = role_of(node)
+            if wanted and role not in wanted:
+                continue
+            name = name_of(node)
+            if match != "*" and (not name or match not in name):
+                continue
+            ext = extent_of(node)
+            if not ext or ext[2] <= 0 or ext[3] <= 0:
+                continue
+            x, y, w, h = ext
+            return {"found": True, "name": name, "role": role,
+                    "x": x, "y": y, "w": w, "h": h,
+                    "center": [x + w // 2, y + h // 2]}
+        except Exception:
+            continue
+    return {"found": False, "match": match}
 
 
 def dfs(acc, depth=0, max_depth=24):
@@ -496,7 +545,8 @@ def main():
         print(json.dumps({"apps": apps}, ensure_ascii=False))
         return 0
 
-    if cmd not in ("tree", "action", "text", "click", "clickseq", "texts", "settext") or len(sys.argv) < 3:
+    if cmd not in ("tree", "action", "text", "click", "clickseq", "texts", "settext",
+                   "locate") or len(sys.argv) < 3:
         print("参数不足", file=sys.stderr)
         return 2
     app = find_app(sys.argv[2])
@@ -539,6 +589,16 @@ def main():
             return 2
         print(json.dumps(cmd_settext(app, sys.argv[3], sys.argv[4]), ensure_ascii=False))
         return 0
+    if cmd == "locate":
+        if len(sys.argv) < 4:
+            print("缺少名称子串", file=sys.stderr)
+            return 2
+        roles = None
+        for tok in sys.argv[4:]:
+            if tok.startswith("roles="):
+                roles = [r.strip() for r in tok[6:].split(",") if r.strip()] or None
+        print(json.dumps(cmd_locate(app, sys.argv[3], roles), ensure_ascii=False))
+        return 0
 
     # 路径寻址命令（仅当与 dump 在同一进程内使用才可靠，保留作调试）
     if len(sys.argv) < 4:
@@ -554,7 +614,8 @@ def main():
         depth = max(1, min(opts["depth"], 16))
         if opts["mode"] == "interactive":
             # 默认：可交互元素扁平清单（一跳拿到可点清单，省 LLM 上下文）
-            print(json.dumps(cmd_tree_interactive(app, depth, opts["roles"]),
+            print(json.dumps(cmd_tree_interactive(app, depth, opts["roles"],
+                                                  include_geom=opts["geom"]),
                              ensure_ascii=False))
         elif opts["compact"]:
             print(json.dumps(serialize_compact(app, 0, depth, [0]), ensure_ascii=False))

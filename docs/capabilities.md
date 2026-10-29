@@ -26,8 +26,9 @@
 | | Qt 应用（Qt5） | ✅ | 2026-10-18 实测（附录 A）：`QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1` 已落 /etc/environment，重启持久（PAM→GDM→niri→spawn 全链验证）；PyQt5 探针窗注册/dump/写/点/读全链通（"你好，重启后"）。QLabel 不实现 Text 接口（文本在 accessible name）——桥已回落 name 读回 |
 | | 同名多实例寻址 | ⚠️ | 本次实证：桌面与水族馆各有一个 gnome-calculator 时，桥按名称解析到先注册者——agent 需自己判别实例（读文本对状态）后再操作，或关掉多余实例 |
 | | Chromium（含 browser-mcp 实例） | ✅（读/文本输入） | 2026-10-18 实测（附录 B），三条件：① `--force-renderer-accessibility`（browser-mcp 已默认带，`AGENTOS_BROWSER_NO_A11Y=1` 可关）；② `toolkit-accessibility=true`（已全局开；**a11y bus 必须在应用启动前启用**，后开无效需重启应用）；③ 树懒构建，AT 调 GetAttributes 触发（桥已内建 prime）。页面元素树完整、按名读文本 ✅；entry 经 grabFocus+wtype 输入 ✅；**按钮 doAction 派发成功但不激活 onclick**（Chromium 155 两会话复现）——页面点击走 L2 CDP 本职 |
-| | Electron（goose desktop 等） | ⚠️（读待验/点击 ✅） | 引擎同源、同 flag 启用（附录 B"Electron"）；goose desktop 已带 `--force-renderer-accessibility`（树读待真实用例验证）；**点击已实测 ✅**——不走 a11y 而走 CDP（附录 D：app-cdp.mjs + 固定 9223，模型选择器弹层三证） |
-| | Java (Swing/AWT) | ❌ | 需 Java Access Bridge + GTK look-and-feel；系统仅 headless JDK，未装未测——补齐路径见附录 B"Java" |
+| | Electron（第三方，VS Code 实测） | ✅ | 2026-10-29 实测（附录 F）：VS Code 1.144 rpm **裸启动**（无 flag、无调试端口）+ 全局 toolkit-accessibility=true，树 2~3 轮读全出（Welcome 对话框/标题栏/菜单/状态栏 75+ 元素）；**AT-SPI doAction 在 renderer 按钮上真触发**（"Continue without Signing In"→欢迎流程前进，前后截图为证）——与 Chromium 浏览器"doAction 不激活 onclick"相反；指针级点击/弹层验证用组合工具 `app-click-precise.sh`（附录 F）。goose desktop 的 CDP 通道结论（附录 D）不变 |
+| | Firefox | ✅ | 2026-10-29 实测（附录 F）：Gecko GTK 栈全通——树读 121 元素（中文 UI+页面内容全可读）、**doAction 真激活 onclick**（点按钮→JS 改文本→texts 读回"已点击：2026-10-29"），与 Chromium 相反；无需 flag、无需组合工具 |
+| | Java (Swing/AWT) | ✅ | 2026-10-29 实测（附录 F）：Swing 窗（GTK LAF）+ Debian `java-atk-wrapper`（**Fedora OpenJDK 不带 Linux 桥**——附录 B 旧论断修正）→ 桥 tree/settext/click/texts 全链通：写名字→点"打招呼"→读回"你好，xxx"；启用只需一行启动参数（附录 F 有完整命令行） |
 | | X11 老应用（XWayland） | ⚠️（分层） | 2026-10-18 实测（附录 B）：xwayland-satellite 0.8.2 在位在跑（:0）。**GTK3 强制 X11 后端全通**（注册/写/点/读——atk-bridge 走 DBus，与显示后端无关）；**GTK4 X11 后端不注册**（gtk4 a11y 桥绑 Wayland）；**纯 X11 应用（xterm）能跑但无树**——只能 L3 兜底 |
 | | niri 自身 UI（热键浮层/overview） | ❌ | 合成器内部 overlay，不在 AT-SPI 总线（本次实证）；按 Esc 关，输入注入可达 |
 | **L2 浏览器 CDP** | 页面打开/填表/提交/读内容/截图 | ✅ | browser-mcp（Chromium+原生 CDP，水族馆内无头）；M3 退出标准：必应表单全链路 + 遇验证码主动拒绝 |
@@ -40,7 +41,7 @@
 
 ## "哪类应用当前打不开/打不好"
 
-1. **Java 桌面应用**（IDE 如 IntelliJ 系、老 Swing 工具）：无 JAB，L1 不可达；L3 键盘+指针可用（盲打但能点）。补齐路径见附录 B"Java"（装完整 JDK + GTK LAF + access bridge，一行启动参数即可验证）。
+1. **Java 桌面应用~~已闭合~~（2026-10-29，附录 F）**：Swing 走 Debian java-atk-wrapper + GTK LAF + 一行启动参数，L1 全链通。**新边界**：Wayland 下 AT-SPI 的"屏幕坐标"实为窗口相对坐标（附录 F），需要指针级点击走 `app-click-precise.sh`（自动全屏化校正）；AWT 老应用若用 Windows LAF 仍无桥。
 2. **纯 X11 老应用**（xterm/motif/自绘 X 工具）：XWayland 下能跑（xwayland-satellite 实证）但无 a11y 树，L1 无从下手——L3 截图+键盘+指针（mouse-click.sh 绝对坐标）兜底。**GTK 系 X11 应用不受此限**（GTK3-X11 实测全通）；GTK4 的 X11 后端不注册树（罕见场景，GTK4 应用默认 Wayland）。
 3. **Chromium/Electron 未带 a11y 开关启动的**：树不暴露。本机 browser-mcp 已默认带 flag；第三方 Chromium/Electron 应用需各自带 flag 启动（附录 B），且 a11y bus 必须先于应用启用。点击不受此限——带 `--remote-debugging-port` 启动即可走 app-cdp（附录 D）。
 4. **合成器自身 UI**（浮层/overview/锁屏）：无障碍总线之外，只能 L3 输入注入（Esc 键盘、mouse-click.sh 指针均可）；水族馆初始热键浮层即此类（本次实证用 Esc 注入关闭）。
@@ -53,7 +54,7 @@
 1. ~~Qt 全局开关~~ ✅ 已完成（2026-10-18，附录 A）；
 2. ~~Chromium a11y flag~~ ✅ browser-mcp 已默认带 + 全局 toolkit-accessibility 已开（附录 B）；第三方 Electron 应用统一加 flag 的包装脚本待真实用例；
 3. **X11 桥验证** ✅ 已定论（附录 B：GTK3-X11 全通 / 纯 X11 无树——后者无桥可装，L3 是终点）；
-4. **JAB**（等真实用例出现再装，路径见附录 B）；
+4. ~~JAB~~ ✅ 已完成（2026-10-29，附录 F：Debian java-atk-wrapper 三件套 + 一行启动参数，Swing 全链实测）；
 5. ~~指针精度~~ ✅ 已根治（2026-10-19，附录 C：uinput tablet 协议绝对坐标，mouse-click.sh 用户级）；
 6. ~~桌面 Electron 点击通道~~ ✅ 已统一（2026-10-19，附录 D：app-cdp.mjs + goose 固定 9223）；
 7. ~~真·双 seat 键鼠并行~~ ✅ 已成立（2026-10-25，附录 E：水族馆 display 虚拟键鼠协议直连，不需要 niri 上游多 seat；"借道聚焦三步走"降级为主桌面兜底）。
@@ -137,7 +138,7 @@
    页面点击本来就是 L2 CDP 的本职（browser_eval 一步到位），L1 对 Chromium 的定位是
    **树读 + 状态读 + 文本输入**。
 
-**Electron 启用（引擎同源，推断路径）**：Electron 即 Chromium，同一 flag 直接有效：
+**Electron 启用（引擎同源，推断路径）**：（2026-10-29 更新：VS Code 实测**裸启动即可读树+doAction**，见附录 F——下述 flag 仅在旧引擎/特殊场景需要）Electron 即 Chromium，同一 flag 直接有效：
 `code --force-renderer-accessibility`（VS Code；首启还会问"是否在使用屏幕阅读器"，选是或
 设 `editor.accessibilitySupport: "on"`，否则 VS Code 只暴露编辑器级树）；其他 Electron 应用
 同法加 flag（或改 .desktop/包装脚本统一注入）。同样要求 toolkit-accessibility 先于启动为
@@ -161,7 +162,9 @@ xwayland-satellite 0.8.2 在位在跑（`xwayland-satellite :0`，DISPLAY=:0）�
 
 ### Java：JAB 补齐路径（文档化，未装）
 
-系统仅 `java-25-openjdk-headless`（无 AWT/Swing GUI）。真实用例出现时的启用路径：
+（2026-10-29 更新：**已装已测全通**，且本文第 3 条"OpenJDK 内置 Linux Access Bridge"在
+Fedora 打包上**不成立**——`java-25-openjdk` rpm 清单里没有任何 atk 文件。实际路径见附录 F。
+以下保留作历史记录。）系统仅 `java-25-openjdk-headless`（无 AWT/Swing GUI）。真实用例出现时的启用路径：
 
 1. `dnf install java-25-openjdk`（完整版，含 libawt_xawt/Swing）；
 2. Swing 应用用 GTK look-and-feel 才有桥：`-Dswing.defaultlaf=com.sun.java.swing.plaf.gtk.GTKLookAndFeel`；
@@ -407,3 +410,84 @@ glm-5.3-flash（bigmodel anthropic 兼容通道）/ `goose run --quiet --max-tur
 - 嵌套 niri 的 Important Hotkeys 浮层问题依旧（skip-at-startup 在嵌套模式未生效，f2d8c04
   遗留）：a11y 路径不受影响，截图可能带浮层；agent_screenshot 描述已注明"如实说明即可，
   不必反复重试"（未注明前实测一轮被模型拖去 5 分钟试图关闭）。
+## 附录 F：三个矩阵缺口补绿——VS Code / Firefox / Java 全链实测（2026-10-29 VM，worktree feat/a11y-full-green）
+
+> 目标：把矩阵上三个非 ✅ 行（第三方 Electron、Firefox、Java）补成实测 ✅。
+> 全部在 VM 主会话实测；截图前后对比存证（正文引述结论，图不入库）。
+
+### 1. 第三方 Electron：VS Code 1.144（rpm，aarch64）
+
+**安装**：官网直链 `update.code.visualstudio.com/latest/linux-rpm-arm64/stable`（Mac curl -L
+中转 → scp → `dnf install ./code-*.rpm`；VM 直连超时老问题）。1.144.0，装后 940MB。
+
+**树读 ✅（裸启动即可）**：`code` 正常启动（无 `--force-renderer-accessibility`、无调试端口、
+`DISPLAY=:0` 走 XWayland）+ 全局 `toolkit-accessibility=true`（已是系统默认）→ 桥以 AT 身份
+注册 + touch 触发懒建树，**2~3 轮读全出**（首轮 18 元素骨架 + 空 document web，二轮 75，
+三轮 95+）：Welcome 对话框、标题栏（Close/Minimize/Maximize）、菜单、状态栏全部按名可寻址。
+**附录 B 的"必须带 flag"对 VS Code 新版不成立**——它监听 Chromium 的 AXMode 变化自动开。
+
+**doAction ✅（推翻矩阵旧预期）**：矩阵此前按 Chromium 结论预判"Electron doAction 不触发"。
+实测：`click code "Continue without Signing In"` → `{"done":true}` 且欢迎对话框**真实前进**
+（Sign In 步骤 → Make It Yours 主题选择步骤，前后截图对比）。结论：**renderer 树开出来后，
+Electron 的 AT-SPI doAction 在页面按钮上真激活**；Chromium 浏览器"派发成功但不激活 onclick"
+的旧结论是浏览器侧（155 两会话复现过）——两者引擎同源行为不同，以实测为准。
+
+**组合工具 `scripts/app-click-precise.sh` ✅**（a11y 定位 → 指针绝对点击）：
+- 实测三击：`Get Started`（renderer 按钮，欢迎对话框关闭进主界面）✓；
+  `Notifications`（状态栏 section，通知中心面板弹出 "No New Notifications"）✓；
+  汉堡 ≡ 按钮无 accessible name——**按名寻址点不到，如实边界**（空名元素可用 `locate "*"
+  roles=menu` 兜，但首个匹配语义弱）。
+- **重大坐标语义发现（Wayland 通用）**：AT-SPI Component 的 DESKTOP_COORDS 在 niri 下返回
+  **窗口相对坐标**，不是屏幕坐标——Wayland 客户端不知道自己窗口的全局位置。实测：VS Code
+  tiled 时对 locate 报告中心直接点击 → 落在 niri 状态栏，零效果；全屏化（原点确定）后同样
+  的调用一击命中（Maximize 按钮 → 窗口真实退出全屏）。因此工具默认流程＝**先 niri 聚焦+
+  全屏化目标窗口 → 再 locate（reflow 后的几何才是对的）→ 点击 → toggle 恢复**。
+- 顺带发现：quickshell 状态栏是悬浮 overlay，空白处点击穿透（全屏窗口在下面收到点击）、
+  组件处吃点击——穿透行为让"全屏窗口原点=(0,0)"模型成立。
+
+### 2. Firefox 150（dnf，Gecko GTK 栈）
+
+- 树读 ✅：`tree Firefox 16` → 121 元素（测试页 heading/按钮/段落 + 浏览器 UI 全中文可读）。
+- **doAction ✅ 真激活 onclick**：`click Firefox "点我改变文本"` → `{"done":true}` →
+  `texts` 读回段落文本 "已点击：2026-10-29"（JS 已执行）。与 Chromium 相反，无需组合工具。
+- 实测坑三条（与 a11y 无关但费时，记下来）：① 端口 7788 被 AgentOS canvas 服务占用，
+  测试页换 7899；② Firefox 150 默认 profile 在 `~/.config/mozilla/firefox/`（XDG 新位），
+  `~/.mozilla` 是旧位；会话恢复的旧标签会先占首窗，清 `sessionstore.jsonlz4` 才干净；
+  ③ `--profile` 指向 /tmp 或新目录在 SELinux 下报 "profile cannot be loaded"。
+
+### 3. Java Swing（java-25-openjdk-devel + Debian JAW）
+
+- **Fedora OpenJDK 不带 Linux 桥**（附录 B 旧论断修正）：`java-25-openjdk` rpm 清单中
+  atk 文件数为 0（只有 libjawt.so），系统也无 `java-atk-wrapper` 包。Fedora 44 亦无
+  java-21（任务给的名字不存在，装的是 java-25-openjdk-devel）。
+- **实际启用路径（全部成立）**：Debian 包三件套（Mac 中转下载 → dpkg 无 → `ar x`+`tar`
+  解包）：`java-atk-wrapper.jar` + `libatk-wrapper.so`（arm64）+ accessibility.properties
+  模板。启动参数一行：
+  ```bash
+  java -Djavax.accessibility.assistive_technologies=org.GNOME.Accessibility.AtkWrapper \
+       -Djava.library.path=<so 所在目录> \
+       -cp .:<java-atk-wrapper.jar> SwingDemo
+  ```
+  （OpenJDK Toolkit 读该系统属性 → Class.forName 加载 AtkWrapper → native 桥注册 AT-SPI；
+  JDK 25 会打 native access 警告，不影响功能。）
+- **全链 ✅**：应用以窗口标题 "Swing演示" 注册 → 树读 4 控件（label/text/button/label，
+  GTK LAF 前提）→ `settext` 写入 "AgentOS组合工具" → `click "打招呼"` → `texts` 读回
+  **"你好，AgentOS组合工具"**。role 命名与 GTK 一致（"text"），桥零改动。
+
+### 4. 桥与工具面变化（本提交）
+
+- `atspi_bridge.py`：新增 `locate <app> <名称子串> [roles=...]`（按名找元素 + Component
+  几何 + 中心点）；`tree` 新增 `geom=1`（interactive 清单每元素附屏幕几何）。坑：pyatspi
+  的 Component 方法是 `getExtents`（复数，返回 BoundingBox 四元组），C API 名 `get_extent`
+  直译的 `getExtent` 不存在。
+- `scripts/app-click-precise.sh`（新）：`app-click-precise.sh [--window-id N]
+  [--no-fullscreen] [--keep-fullscreen] <app> <元素子串>`——niri 聚焦+全屏化 → 桥 locate
+  → mouse-click.sh 绝对点击 → 恢复。适用：doAction 不激活（Chromium 页面）、无 Action
+  接口的自绘控件；doAction 已通的应用（GTK/Qt/Firefox/VS Code renderer）优先
+  `atspi_bridge.py click`。
+- `atspi-mcp` 包未动（bridge.ts 命令构造测试不涉新子命令；npm test 308 全绿）。
+
+### 5. 清理记录
+
+测试窗全关（code/firefox/java/http.server 精确 pid 或 niri close-window）；VM 侧 rpm/deb/
+解包目录/截图/备份文件删除；Mac 侧中转文件删除；Firefox 测试 profile 会话恢复清空。

@@ -68,6 +68,26 @@
 - 文档：capabilities.md 附录 E（新）+ 矩阵行 + 升级路径 7；architecture.md §3.3 更新
   （V3 行改为"输出隔离按需再做"）+ 变更记录；goose-system.md 通道模型改为三级优先
   （a11y/CDP → agent-input.sh → 主 seat 借道兜底）。
+
+- **三缺口补绿（a11y 矩阵 Electron/Firefox/Java 全 ✅，worktree feat/a11y-full-green）**：
+  ① **VS Code 1.144**（rpm Mac 中转→scp→dnf）裸启动树读全出（无 flag 无调试端口——附录 B
+  "必须带 flag"对新版不成立）；**doAction 真触发**（点 "Continue without Signing In" 欢迎
+  流程真实前进，前后截图为证）——推翻矩阵"Electron doAction 不激活"的旧预期，与 Chromium
+  浏览器行为相反。组合工具 `scripts/app-click-precise.sh`（a11y 定位→绝对点击）三击验证：
+  Get Started ✓、Notifications 面板弹出 ✓、汉堡 ≡ 无 accessible name 点不到（如实边界）。
+  ② **Firefox 150**：树读 121 元素、doAction 真激活 onclick（texts 读回 JS 改写的
+  "已点击：2026-10-29"）——Gecko 栈无需 flag 无需组合工具。
+  ③ **Java Swing**：Fedora OpenJDK 不带 Linux 桥（附录 B 旧论断修正：rpm 清单 0 个 atk
+  文件；java-21 在 F44 也无此包，实装 java-25-openjdk-devel）——Debian java-atk-wrapper
+  三件套（Mac 中转+ar/tar 解包）+ 一行启动参数即全链通：settext→click→texts 读回
+  "你好，AgentOS组合工具"。
+  **新边界（Wayland 通用，重要）**：AT-SPI Component 的 DESKTOP_COORDS 实为**窗口相对
+  坐标**（客户端不知道自己全局位置）——VS Code tiled 时按报告中心点点击落状态栏零效果；
+  组合工具因此默认"先 niri 聚焦+全屏化→再定位（reflow 后几何才对）→点击→恢复"，实测
+  一击命中。桥新增 `locate` 子命令与 `tree geom=1`（坑：pyatspi 方法名是 getExtents 复数）。
+  npm test 308 全绿（基线 299+）；测试窗/进程/临时包全清。
+  文档：capabilities.md 矩阵三行+附录 F；SKILL.md L1 面更新+组合工具专节。
+
 ## 2026-10-25（a11y 提速：计算器基准 46.5s → 18.9s，四刀收口）
 
 worktree `feat/a11y-speed`。目标可量化：goose 在水族馆操作 gnome-calculator 算

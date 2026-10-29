@@ -13,9 +13,9 @@ description: 操作 AgentOS 桌面（niri/Wayland）：窗口与工作区管理�
 
 1. **L0 系统层**——窗口/工作区/启动/文件/通知/剪贴板（niri/desktop/system/files 扩展）：最稳，优先用；
 2. **L1 无障碍树**——GUI 应用内按名称点击/读写文本（a11y 扩展，AT-SPI2）：无需焦点、不打扰用户，
-   GTK3/GTK4/Qt 实测全通（Qt 的全局开关与 Chromium 的 toolkit-accessibility 已是系统默认，
-   2026-10-18 起）；Chromium 树读/文本输入可达（**页面点击走 L2 或 app-cdp**）；Java 未装（路径见
-   capabilities.md 附录 B）；纯 X11 应用（xterm 类）无树，只能 L3；
+   GTK3/GTK4/Qt/Firefox/Java(Swing)/VS Code 实测全通（Qt 的全局开关与 Chromium 的 toolkit-accessibility 已是系统默认，
+   2026-10-18 起；Firefox/Java/VS Code 2026-10-29 补绿，见 capabilities.md 附录 F）；Chromium 树读/文本输入可达（**页面点击走 L2 或 app-cdp**）；
+   纯 X11 应用（xterm 类）无树，只能 L3；
 3. **L2 浏览器 CDP**——网页一切操作（browser 扩展，agent 专属无头 Chromium）；
    **桌面 Electron/Chromium 应用**（goose desktop 等）点按钮走 `scripts/app-cdp.mjs`
    （统一 CDP 通道，Input.dispatchMouseEvent 真实点击；goose 固定端口 9223）；
@@ -105,7 +105,22 @@ Chromium 例外注意：树懒构建（桥自动触发，首次 dump 多等 1-2 
 "grabFocus + kb-inject type"组合**（Chromium 的 entry 不吃 setTextContents）；页面**按钮点击
 不生效**（doAction 派发但 onclick 不跑）——agent 专属浏览器内的页面走 browser 扩展，
 **桌面 Electron/Chromium 应用**（goose desktop、主会话开的 chromium 等）走 `scripts/app-cdp.mjs`
-（见下"桌面 Electron/Chromium 应用点击"）。
+（见下"桌面 Electron/Chromium 应用点击"）。doAction 生效面（2026-10-29 实测）：Firefox
+（onclick 真激活）、VS Code/Electron renderer 树读出来后**真触发**——都不需要组合工具；
+仅 Chromium 浏览器页面按钮是"派发成功不激活"。
+
+### 指针级精确点击（`scripts/app-click-precise.sh`，L1 定位 × L3 点击）
+| 命令 | 用途 |
+|---|---|
+| `app-click-precise.sh <app> <元素子串>` | a11y 树定位元素几何中心 → uinput tablet 绝对点击（默认先 niri 聚焦+全屏化目标窗口再定位，点完恢复） |
+| `--window-id N` | 指定 niri 窗口 id（默认按应用名模糊匹配） |
+| `--no-fullscreen` / `--keep-fullscreen` | 跳过全屏化（调试）/ 点完不恢复 |
+
+适用：doAction 不激活的（Chromium 浏览器页面按钮）、无 Action 接口的自绘控件。**不要**在
+doAction 已通的应用上用它（全屏化会打扰用户视口）。为什么先全屏化：Wayland 客户端不知道
+自己窗口的全局位置，AT-SPI 的"屏幕坐标"实为窗口相对坐标（2026-10-29 实测，tiled 时直接点
+报告中心会落空）——全屏化把窗口原点钉到 (0,0)，报告坐标即全局坐标。注意 VS Code 标题栏
+图标（汉堡 ≡ 等）无 accessible name，按名寻址点不到（用 app-cdp 或坐标兜）。
 
 ### browser —— 网页操作（L2，agent 专属无头 Chromium）
 | 工具 | 用途 | 关键参数 |
@@ -194,7 +209,7 @@ goose 模型选择器弹层展开三证齐全（截图 + data-state=open + [role
 | Qt 应用不出现在 a11y 总线 | `a11y_list_apps` 看不到 | 系统已全局开（/etc/environment 的 `QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1`，重启持久）；仍看不到=应用启动早于环境落位或非 Qt 官方绑定，重启应用 |
 | Chromium/Electron a11y 树为空 | dump 不出内容 | ① 启动带 `--force-renderer-accessibility`（browser 扩展已默认带）；② `toolkit-accessibility` 必须在**应用启动前**为 true（已全局开；后改无效，须重启应用）；③ 树懒构建，dump 一次让桥触发（见 §2 a11y 纪律） |
 | 键盘注入选型 | 需要打字/快捷键 | `scripts/kb-inject.sh`：文本与组合键用 wtype（用户级）；**回车/Tab 等控制键 wtype 对 GTK 不生效**，走 ydotool（sudo）；中文可能丢首字符，输完从 a11y 树读回核对 |
-| 指针注入选型 | 需要鼠标点击 | `scripts/mouse-click.sh <x> <y> [left\|right]`：uinput tablet 协议绝对坐标（用户级，2026-10-19 根治）。ydotool mousemove -a 已弃用（加速度漂移）；uinput tablet 两个内核细节见 capabilities.md 附录 C（BTN_STYLUS=0x14b、ABS 轴必须带 resolution） |
+| 指针注入选型 | 需要鼠标点击 | `scripts/mouse-click.sh <x> <y> [left\|right]`：uinput tablet 协议绝对坐标（用户级，2026-10-19 根治）。ydotool mousemove -a 已弃用（加速度漂移）；uinput tablet 两个内核细节见 capabilities.md 附录 C（BTN_STYLUS=0x14b、ABS 轴必须带 resolution）。有 a11y 名字时优先 `scripts/app-click-precise.sh`（树定位+绝对点击，见 §2 后的专节） |
 | app-cdp 点击没反应 | Electron 弹层不开 | click 已带 mouseMoved hover 前置；仍不开先 `eval` 用 elementFromPoint 核对坐标对应元素；目标应用必须带 `--remote-debugging-port` 启动 |
 | /dev/uinput 不可写 | mouse-click.sh 报权限 | 用户级=udev 规则（input 组 0660，镜像已带）+ 用户入 input 组（重新登录）；或回落 SUDO_PW 环境变量 + sudo |
 | 水族馆初始有 niri 热键浮层 | 截图被"Important Hotkeys"遮挡 | 注入 Esc 关闭；键盘用 kb-inject（wtype 用户级）；ydotool 路径需 sudo（ydotoold socket root 600） |
